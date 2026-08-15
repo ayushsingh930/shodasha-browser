@@ -1,25 +1,29 @@
 /**
  * SHODASHA desktop - main process entry point.
  *
- * The main process owns the application lifecycle, creates secure
- * BrowserWindows with context isolation, and (in later milestones) wires the
- * core's content-filter engine into the session request pipeline.
+ * Owns the application lifecycle, creates a secure BrowserWindow, and wires
+ * the platform-agnostic core's TabManager onto Electron via the
+ * BrowserController.
  */
 
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Logger } from '@shodasha/core';
+import { Logger, TabManager } from '@shodasha/core';
+import { BrowserController } from './browserController.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const logger = new Logger({ level: 'info' });
 
+let controller: BrowserController | null = null;
+
 /**
- * Hardened WebPreferences. Context isolation is on, node integration is off,
- * and sandbox is on for the renderer. This is the secure-by-default baseline.
+ * Hardened WebPreferences for the chrome UI. Context isolation is on, node
+ * integration is off, and sandbox is on. This is the secure-by-default
+ * baseline for the application chrome.
  */
-function secureWebPreferences(): Electron.WebPreferences {
+function secureChromePreferences(): Electron.WebPreferences {
   return {
     contextIsolation: true,
     nodeIntegration: false,
@@ -36,17 +40,29 @@ function createMainWindow(): BrowserWindow {
     height: 800,
     title: 'SHODASHA Browser',
     backgroundColor: '#ffffff',
-    webPreferences: secureWebPreferences(),
+    webPreferences: secureChromePreferences(),
   });
 
-  // Open external links in the system browser, never inside the app chrome.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
-    return { action: 'deny' };
+  // Never open arbitrary windows; the controller opens new tabs instead.
+  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // External, non-web links open in the system browser only.
+  win.webContents.on('will-navigate', (event, url) => {
+    if (!/^https?:/i.test(url)) {
+      event.preventDefault();
+    }
   });
 
   const rendererHtml = path.join(__dirname, '..', 'renderer', 'index.html');
   void win.loadFile(rendererHtml);
+
+  const manager = new TabManager();
+  controller = new BrowserController({ window: win, manager });
+  controller.init();
+
+  win.on('closed', () => {
+    controller?.dispose();
+    controller = null;
+  });
 
   return win;
 }

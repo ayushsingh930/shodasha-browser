@@ -1,11 +1,26 @@
 :root {
-  --bg: #0f172a;
-  --fg: #e2e8f0;
-  --accent: #38bdf8;
+  --chrome-bg: #ffffff;
+  --chrome-fg: #0f172a;
+  --chrome-border: #e2e8f0;
+  --accent: #0ea5e9;
+  --accent-strong: #0284c7;
+  --secure: #16a34a;
+  --insecure: #dc2626;
+  --internal: #64748b;
+  --muted: #64748b;
+  --tab-active-bg: #f1f5f9;
+  --tab-hover-bg: #f8fafc;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --chrome-height: 96px;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
@@ -16,38 +31,312 @@ body {
     'Segoe UI',
     Roboto,
     sans-serif;
-  background: var(--bg);
-  color: var(--fg);
-  min-height: 100vh;
+  background: var(--chrome-bg);
+  color: var(--chrome-fg);
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------------------------------------------------------------------ toolbar */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
+  box-shadow: var(--shadow);
+}
+
+.nav-controls,
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-actions {
+  position: relative;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--chrome-fg);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--tab-hover-bg);
+}
+
+.icon-button:disabled {
+  color: #cbd5e1;
+  cursor: default;
+}
+
+.address-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+#address-bar {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 16px;
+  background: #f8fafc;
+  color: var(--chrome-fg);
+  font-size: 14px;
+  outline: none;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+#address-bar:focus {
+  border-color: var(--accent);
+  background: #ffffff;
+}
+
+/* ---------------------------------------------------------- security state */
+
+.secure-state {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.secure-state.state-none {
+  color: transparent;
+  background: transparent;
+}
+
+.secure-state.state-secure {
+  color: var(--secure);
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.secure-state.state-insecure {
+  color: var(--insecure);
+  background: rgba(220, 38, 38, 0.12);
+}
+
+.secure-state.state-internal {
+  color: var(--internal);
+  background: rgba(100, 116, 139, 0.14);
+}
+
+/* ------------------------------------------------------------------ tab bar */
+
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 40px;
+  padding: 6px 8px 0;
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 200px;
+  min-width: 120px;
+  max-width: 200px;
+  height: 32px;
+  padding: 0 6px 0 10px;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--chrome-fg);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 120ms ease;
+}
+
+.tab:hover {
+  background: var(--tab-hover-bg);
+}
+
+.tab.active {
+  background: var(--tab-active-bg);
+  font-weight: 600;
+}
+
+.tab-favicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tab-favicon img {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.tab-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab.loading .tab-title::after {
+  content: '';
+  display: inline-block;
+  width: 0.7em;
+  height: 0.7em;
+  margin-left: 6px;
+  border: 2px solid rgba(14, 165, 233, 0.25);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border-radius: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.tab-close:hover {
+  background: rgba(15, 23, 42, 0.08);
+  color: var(--chrome-fg);
+}
+
+.tab-spacer {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 8px;
+}
+
+/* -------------------------------------------------------------- content frame */
+
+.content-frame {
+  flex: 1 1 auto;
+  position: relative;
+  background: #ffffff;
+  min-height: 0;
+}
+
+.content-frame.empty {
   display: grid;
   place-items: center;
 }
 
-.shell {
-  text-align: center;
+.error-notice {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  max-width: 520px;
   padding: 2rem;
+  text-align: center;
+  color: var(--muted);
 }
 
-.brand h1 {
-  font-size: 2.5rem;
-  margin: 0 0 0.25rem;
-  letter-spacing: -0.02em;
-}
-
-.tagline {
-  margin: 0;
-  color: var(--accent);
+.error-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  font-size: 0.75rem;
   font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-.status {
-  margin-top: 2rem;
+.error-notice p {
+  margin: 0;
   font-size: 0.95rem;
-  opacity: 0.85;
+  line-height: 1.5;
+  color: var(--chrome-fg);
 }
 
-.footnote {
-  margin-top: 3rem;
-  font-size: 0.8rem;
-  opacity: 0.5;
+/* --------------------------------------------------------------------- menu */
+
+.menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--chrome-border);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.menu[hidden] {
+  display: none;
+}
+
+.menu button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--chrome-fg);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu button:hover {
+  background: var(--tab-hover-bg);
 }

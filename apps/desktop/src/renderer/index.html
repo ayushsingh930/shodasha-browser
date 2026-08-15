@@ -4,25 +4,95 @@
     <meta charset="UTF-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:"
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SHODASHA Browser</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <main class="shell">
-      <header class="brand">
-        <h1>SHODASHA Browser</h1>
-        <p class="tagline">Private. Fast. Yours.</p>
+    <div id="app" class="browser">
+      <header class="toolbar">
+        <div class="nav-controls">
+          <button
+            id="btn-back"
+            class="icon-button"
+            title="Back"
+            aria-label="Back"
+            disabled
+          >
+            &#8592;
+          </button>
+          <button
+            id="btn-forward"
+            class="icon-button"
+            title="Forward"
+            aria-label="Forward"
+            disabled
+          >
+            &#8594;
+          </button>
+          <button
+            id="btn-reload"
+            class="icon-button"
+            title="Reload"
+            aria-label="Reload"
+          >
+            &#8635;
+          </button>
+          <button
+            id="btn-stop"
+            class="icon-button"
+            title="Stop loading"
+            aria-label="Stop loading"
+            hidden
+          >
+            &#10005;
+          </button>
+        </div>
+
+        <div class="address-area">
+          <span id="security" class="secure-state state-none"></span>
+          <input
+            id="address-bar"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="Search or enter an address"
+            aria-label="Address and search bar"
+          />
+        </div>
+
+        <div class="toolbar-actions">
+          <button
+            id="btn-new-tab"
+            class="icon-button"
+            title="New tab"
+            aria-label="New tab"
+          >
+            +
+          </button>
+          <button
+            id="btn-menu"
+            class="icon-button"
+            title="Menu"
+            aria-label="Menu"
+          >
+            &#8942;
+          </button>
+          <nav id="menu" class="menu" hidden>
+            <button type="button" data-action="new-tab">New tab</button>
+            <button type="button" data-action="close-tab">Close tab</button>
+            <button type="button" data-action="reload">Reload</button>
+          </nav>
+        </div>
       </header>
-      <section class="status" aria-live="polite">
-        <p id="status-text">Loading…</p>
-      </section>
-      <footer class="footnote">
-        <p>Foundation build. Browser features arrive in later milestones.</p>
-      </footer>
-    </main>
+
+      <nav id="tab-bar" class="tab-bar" aria-label="Tabs"></nav>
+
+      <main id="content-frame" class="content-frame"></main>
+    </div>
+
     <script type="module" src="./renderer.js"></script>
   </body>
 </html>

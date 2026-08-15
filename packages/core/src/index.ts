@@ -17,6 +17,48 @@ export {
   stripTrackingParameters,
   stripFragment,
 } from './url/urlPrivacy.js';
+export {
+  parseWebUrl,
+  classifyAddressInput,
+  hasScheme,
+  webSchemeOf,
+} from './url/urlParser.js';
+export type { AddressInput, AddressInputKind } from './url/urlParser.js';
+
+export {
+  DEFAULT_SEARCH_ENGINE,
+  buildSearchUrl,
+  isValidSearchTemplate,
+} from './search/searchEngine.js';
+export type { SearchEngineDefinition } from './search/searchEngine.js';
+
+export {
+  classifyLoadError,
+  invalidAddressError,
+  blockedNavigationError,
+} from './navigation/errorPages.js';
+export type {
+  NavigationError,
+  NavigationErrorKind,
+} from './navigation/errorPages.js';
+
+export { TabManager } from './navigation/tabManager.js';
+export type { TabEvent, TabListener, CreateTabOptions } from './navigation/tabManager.js';
+export type {
+  Tab,
+  TabLoadingState,
+  SecurityState,
+  NavigationHistory,
+} from './navigation/tabModel.js';
+export {
+  emptyHistory,
+  currentHistoryUrl,
+  canGoBack,
+  canGoForward,
+  goBack,
+  goForward,
+  pushNavigation,
+} from './navigation/tabModel.js';
 
 export type {
   FilterCategory,
