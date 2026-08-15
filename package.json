@@ -1,0 +1,34 @@
+{
+  "name": "shodasha-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SHODASHA Browser - a privacy-first web browser. Private. Fast. Yours.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=@shodasha/core && npm run build --workspace=@shodasha/desktop",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test --workspaces --if-present",
+    "test:watch": "npm run test:watch --workspace=@shodasha/core",
+    "dev": "npm run dev --workspace=@shodasha/desktop"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2",
+    "vitest": "^4.1.10"
+  }
+}

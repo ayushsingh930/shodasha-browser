@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SHODASHA Browser</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="brand">
+        <h1>SHODASHA Browser</h1>
+        <p class="tagline">Private. Fast. Yours.</p>
+      </header>
+      <section class="status" aria-live="polite">
+        <p id="status-text">Loading…</p>
+      </section>
+      <footer class="footnote">
+        <p>Foundation build. Browser features arrive in later milestones.</p>
+      </footer>
+    </main>
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>
