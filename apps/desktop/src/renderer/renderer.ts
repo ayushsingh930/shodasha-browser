@@ -12,6 +12,7 @@
 import {
   isBlankTabUrl,
   type BrowserState,
+  type ShieldPanelState,
   type TabViewState,
 } from '../shared/browserState.js';
 import {
@@ -19,6 +20,7 @@ import {
   type ShortcutAction,
   type ShortcutInput,
 } from '../shared/shortcuts.js';
+import type { ShieldMode } from '@shodasha/core';
 
 /** The bridge surface exposed by the preload script. */
 interface ShodashaBridge {
@@ -44,6 +46,19 @@ interface ShodashaBridge {
     prevTab(): Promise<void>;
     onStateChanged(callback: (state: BrowserState) => void): () => void;
     onFocusAddressBar(callback: () => void): () => void;
+  };
+  shield: {
+    getState(): Promise<ShieldPanelState>;
+    setEnabled(enabled: boolean): Promise<void>;
+    setMode(mode: ShieldMode): Promise<void>;
+    setSiteSetting(
+      site: string,
+      setting: { enabled?: boolean; mode?: ShieldMode },
+    ): Promise<void>;
+    toggleAllowlist(site: string): Promise<void>;
+    subscribe(): void;
+    unsubscribe(): void;
+    onPanelChanged(callback: (state: ShieldPanelState) => void): () => void;
   };
 }
 
@@ -71,6 +86,24 @@ const ntpPage = document.querySelector<HTMLElement>('#new-tab-page');
 const ntpSearch = document.querySelector<HTMLInputElement>('#ntp-search');
 const tabContextMenu = document.querySelector<HTMLElement>('#tab-context-menu');
 
+// Shield UI elements.
+const shieldButton = document.querySelector<HTMLButtonElement>('#btn-shield');
+const shieldPanel = document.querySelector<HTMLElement>('#shield-panel');
+const siteSettingsPanel = document.querySelector<HTMLElement>('#site-settings-panel');
+const shieldProtection = document.querySelector<HTMLElement>('#shield-protection');
+const shieldStatEvaluated = document.querySelector<HTMLElement>('#shield-stat-evaluated');
+const shieldStatFiltered = document.querySelector<HTMLElement>('#shield-stat-filtered');
+const shieldStatTrackers = document.querySelector<HTMLElement>('#shield-stat-trackers');
+const shieldStatAds = document.querySelector<HTMLElement>('#shield-stat-ads');
+const shieldMode = document.querySelector<HTMLSelectElement>('#shield-mode');
+const shieldToggle = document.querySelector<HTMLButtonElement>('#shield-toggle');
+const shieldSiteSettingsButton = document.querySelector<HTMLButtonElement>('#shield-site-settings');
+const siteSettingsClose = document.querySelector<HTMLButtonElement>('#site-settings-close');
+const siteSettingsCurrent = document.querySelector<HTMLElement>('#site-settings-current');
+const siteSettingsShield = document.querySelector<HTMLButtonElement>('#site-settings-shield');
+const siteSettingsMode = document.querySelector<HTMLSelectElement>('#site-settings-mode');
+const siteSettingsAllowlist = document.querySelector<HTMLButtonElement>('#site-settings-allowlist');
+
 // ----------------------------------------------------------------------
 // State
 // ----------------------------------------------------------------------
@@ -82,8 +115,11 @@ let currentState: BrowserState = {
 let addressEditing = false;
 let contextTabId: string | null = null;
 let lastActiveTabId: string | null = null;
+let shieldState: ShieldPanelState | null = null;
+let shieldUnsubPanel: (() => void) | null = null;
 
 const bridge = window.shodasha?.browser;
+const shieldBridge = window.shodasha?.shield;
 
 // ----------------------------------------------------------------------
 // Toolbar rendering
@@ -486,6 +522,174 @@ function attachMenuHandlers(): void {
 }
 
 // ----------------------------------------------------------------------
+// SHODASHA Shield panel
+// ----------------------------------------------------------------------
+function toggleShieldPanel(): void {
+  if (shieldPanel?.hidden === true) {
+    openShieldPanel();
+  } else {
+    closeShieldPanels();
+  }
+}
+
+function openShieldPanel(): void {
+  if (shieldPanel === null) {
+    return;
+  }
+  if (siteSettingsPanel !== null) {
+    siteSettingsPanel.hidden = true;
+  }
+  shieldPanel.hidden = false;
+  shieldButton?.setAttribute('aria-expanded', 'true');
+  shieldUnsubPanel = shieldBridge?.onPanelChanged(applyShieldState) ?? null;
+  shieldBridge?.subscribe();
+  void shieldBridge?.getState().then(applyShieldState);
+  setTimeout(() => {
+    document.addEventListener('click', onShieldOutsideClick);
+    document.addEventListener('keydown', onShieldEscape);
+  }, 0);
+}
+
+function closeShieldPanels(): void {
+  if (shieldPanel !== null) {
+    shieldPanel.hidden = true;
+  }
+  if (siteSettingsPanel !== null) {
+    siteSettingsPanel.hidden = true;
+  }
+  shieldButton?.setAttribute('aria-expanded', 'false');
+  shieldUnsubPanel?.();
+  shieldUnsubPanel = null;
+  shieldBridge?.unsubscribe();
+  document.removeEventListener('click', onShieldOutsideClick);
+  document.removeEventListener('keydown', onShieldEscape);
+}
+
+function onShieldOutsideClick(event: MouseEvent): void {
+  const target = event.target as Node | null;
+  const actions = document.querySelector<HTMLElement>('.toolbar-actions');
+  if (actions !== null && target !== null && actions.contains(target)) {
+    return;
+  }
+  closeShieldPanels();
+}
+
+function onShieldEscape(event: KeyboardEvent): void {
+  if (event.key === 'Escape') {
+    closeShieldPanels();
+  }
+}
+
+function applyShieldState(state: ShieldPanelState): void {
+  shieldState = state;
+  shieldButton?.classList.toggle('active', state.enabled);
+  shieldButton?.classList.toggle('inactive', !state.enabled);
+  if (shieldProtection !== null) {
+    shieldProtection.textContent = state.enabled ? 'ON' : 'OFF';
+    shieldProtection.className = `shield-badge ${
+      state.enabled ? 'shield-badge-on' : 'shield-badge-off'
+    }`;
+  }
+  setText(shieldStatEvaluated, state.stats.requestsEvaluated);
+  setText(shieldStatFiltered, state.stats.requestsBlocked);
+  setText(shieldStatTrackers, state.stats.trackersBlocked);
+  setText(shieldStatAds, state.stats.adsFiltered);
+  if (shieldMode !== null) {
+    shieldMode.value = state.mode;
+  }
+  if (shieldToggle !== null) {
+    shieldToggle.textContent = state.enabled ? 'Shield ON' : 'Shield OFF';
+    shieldToggle.setAttribute('aria-pressed', String(state.enabled));
+    shieldToggle.classList.toggle('shield-toggle-off', !state.enabled);
+  }
+  if (shieldSiteSettingsButton !== null) {
+    shieldSiteSettingsButton.disabled = state.currentSite === null;
+  }
+  renderSiteSettings(state);
+}
+
+function renderSiteSettings(state: ShieldPanelState): void {
+  if (state.currentSite === null) {
+    setText(siteSettingsCurrent, '\u2014');
+    return;
+  }
+  setText(siteSettingsCurrent, state.currentSite);
+  if (siteSettingsShield !== null) {
+    siteSettingsShield.textContent = state.siteEnabled ? 'ON' : 'OFF';
+    siteSettingsShield.setAttribute('aria-pressed', String(state.siteEnabled));
+  }
+  if (siteSettingsMode !== null) {
+    siteSettingsMode.value = state.siteMode;
+  }
+  if (siteSettingsAllowlist !== null) {
+    siteSettingsAllowlist.textContent = state.siteAllowlisted ? 'ON' : 'OFF';
+    siteSettingsAllowlist.setAttribute('aria-pressed', String(state.siteAllowlisted));
+  }
+}
+
+function setText(element: HTMLElement | null, value: number | string): void {
+  if (element !== null) {
+    element.textContent = String(value);
+  }
+}
+
+function attachShieldHandlers(): void {
+  shieldButton?.addEventListener('click', toggleShieldPanel);
+  shieldToggle?.addEventListener('click', () => {
+    if (shieldState !== null) {
+      void shieldBridge?.setEnabled(!shieldState.enabled);
+    }
+  });
+  shieldMode?.addEventListener('change', () => {
+    void shieldBridge?.setMode(shieldMode.value as ShieldMode);
+  });
+  shieldSiteSettingsButton?.addEventListener('click', () => {
+    if (shieldState?.currentSite === null || shieldState === null) {
+      return;
+    }
+    if (shieldPanel !== null) {
+      shieldPanel.hidden = true;
+    }
+    if (siteSettingsPanel !== null) {
+      siteSettingsPanel.hidden = false;
+    }
+  });
+  siteSettingsClose?.addEventListener('click', () => {
+    if (siteSettingsPanel !== null) {
+      siteSettingsPanel.hidden = true;
+    }
+    if (shieldPanel !== null) {
+      shieldPanel.hidden = false;
+    }
+  });
+  siteSettingsShield?.addEventListener('click', () => {
+    const state = shieldState;
+    const site = state?.currentSite;
+    if (state === null || site === null || site === undefined) {
+      return;
+    }
+    void shieldBridge?.setSiteSetting(site, { enabled: !state.siteEnabled });
+  });
+  siteSettingsMode?.addEventListener('change', () => {
+    const state = shieldState;
+    const site = state?.currentSite;
+    if (state === null || site === null || site === undefined) {
+      return;
+    }
+    void shieldBridge?.setSiteSetting(site, {
+      mode: siteSettingsMode.value as ShieldMode,
+    });
+  });
+  siteSettingsAllowlist?.addEventListener('click', () => {
+    const site = shieldState?.currentSite;
+    if (site === null || site === undefined) {
+      return;
+    }
+    void shieldBridge?.toggleAllowlist(site);
+  });
+}
+
+// ----------------------------------------------------------------------
 // Tab context menu
 // ----------------------------------------------------------------------
 function openTabContextMenu(tabId: string, x: number, y: number): void {
@@ -619,6 +823,7 @@ async function boot(): Promise<void> {
   attachMenuHandlers();
   attachTabContextMenuHandlers();
   attachShortcutHandlers();
+  attachShieldHandlers();
 
   if (bridge === undefined) {
     const root = document.querySelector<HTMLElement>('#app');

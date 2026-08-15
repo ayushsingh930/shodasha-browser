@@ -6,7 +6,7 @@
  * the core tab model.
  */
 
-import type { SecurityState } from '@shodasha/core';
+import type { SecurityState, ShieldMode, ShieldStats } from '@shodasha/core';
 
 /** A tab as presented to the UI. */
 export interface TabViewState {
@@ -29,6 +29,24 @@ export interface BrowserState {
   readonly activeTabId: string | null;
   /** Whether a recently-closed tab can be reopened (Ctrl+Shift+T). */
   readonly canReopenClosedTab: boolean;
+}
+
+/** The state shown in the Shield panel and site-settings panel. */
+export interface ShieldPanelState {
+  /** Whether the Shield is globally enabled. */
+  readonly enabled: boolean;
+  /** The global protection mode. */
+  readonly mode: ShieldMode;
+  /** Current session statistics. */
+  readonly stats: ShieldStats;
+  /** The hostname of the site currently being viewed, if any. */
+  readonly currentSite: string | null;
+  /** Whether the Shield is on for the current site. */
+  readonly siteEnabled: boolean;
+  /** The protection mode for the current site (falls back to the global mode). */
+  readonly siteMode: ShieldMode;
+  /** Whether the current site is allowlisted. */
+  readonly siteAllowlisted: boolean;
 }
 
 /** Whether a URL represents a blank new-tab page (nothing to show). */
@@ -57,4 +75,12 @@ export const IPC = {
   prevTab: 'browser:prev-tab',
   stateChanged: 'browser:state-changed',
   focusAddressBar: 'browser:focus-address-bar',
+  shieldGetState: 'shield:get-state',
+  shieldSetEnabled: 'shield:set-enabled',
+  shieldSetMode: 'shield:set-mode',
+  shieldSetSiteSetting: 'shield:set-site-setting',
+  shieldToggleAllowlist: 'shield:toggle-allowlist',
+  shieldSubscribe: 'shield:subscribe',
+  shieldUnsubscribe: 'shield:unsubscribe',
+  shieldPanelChanged: 'shield:panel-changed',
 } as const;

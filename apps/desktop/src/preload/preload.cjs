@@ -29,6 +29,14 @@ const IPC = {
   prevTab: 'browser:prev-tab',
   stateChanged: 'browser:state-changed',
   focusAddressBar: 'browser:focus-address-bar',
+  shieldGetState: 'shield:get-state',
+  shieldSetEnabled: 'shield:set-enabled',
+  shieldSetMode: 'shield:set-mode',
+  shieldSetSiteSetting: 'shield:set-site-setting',
+  shieldToggleAllowlist: 'shield:toggle-allowlist',
+  shieldSubscribe: 'shield:subscribe',
+  shieldUnsubscribe: 'shield:unsubscribe',
+  shieldPanelChanged: 'shield:panel-changed',
 };
 
 function subscribe(channel, callback) {
@@ -64,5 +72,17 @@ contextBridge.exposeInMainWorld('shodasha', {
     prevTab: () => ipcRenderer.invoke(IPC.prevTab),
     onStateChanged: (callback) => subscribe(IPC.stateChanged, callback),
     onFocusAddressBar: (callback) => subscribe(IPC.focusAddressBar, callback),
+  },
+  shield: {
+    getState: () => ipcRenderer.invoke(IPC.shieldGetState),
+    setEnabled: (enabled) => ipcRenderer.invoke(IPC.shieldSetEnabled, enabled),
+    setMode: (mode) => ipcRenderer.invoke(IPC.shieldSetMode, mode),
+    setSiteSetting: (site, setting) =>
+      ipcRenderer.invoke(IPC.shieldSetSiteSetting, site, setting),
+    toggleAllowlist: (site) =>
+      ipcRenderer.invoke(IPC.shieldToggleAllowlist, site),
+    subscribe: () => ipcRenderer.send(IPC.shieldSubscribe),
+    unsubscribe: () => ipcRenderer.send(IPC.shieldUnsubscribe),
+    onPanelChanged: (callback) => subscribe(IPC.shieldPanelChanged, callback),
   },
 });

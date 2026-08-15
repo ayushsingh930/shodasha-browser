@@ -71,6 +71,40 @@ export type {
 export { SimpleFilterEngine } from './privacy/simpleFilterEngine.js';
 
 export {
+  ShieldEngine,
+  categoriesForMode,
+  RuleEngine,
+  normalizeHostname,
+  isValidHostname,
+  parentDomains,
+  hostnameFromUrl,
+  originFromUrl,
+  sameSite,
+  classifyParty,
+  classifyResourceType,
+  ShieldStatsCounter,
+  emptyShieldStats,
+  InMemoryFilterListSource,
+  parseRuleLines,
+} from './shield/index.js';
+export type {
+  ShieldRequest,
+  ShieldContext,
+  ResourceType,
+  PartyContext,
+  ShieldCategory,
+  ShieldMode,
+  ShieldDecision,
+  ShieldDecisionKind,
+  BlockRule,
+  BlockRuleKind,
+  SiteShieldSetting,
+  ShieldStats,
+  FilterListSource,
+  ParseBlocklistOptions,
+} from './shield/index.js';
+
+export {
   redact,
   redactSecrets,
   loadSecret,

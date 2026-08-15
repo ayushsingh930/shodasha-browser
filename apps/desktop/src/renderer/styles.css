@@ -66,6 +66,22 @@ body {
   position: relative;
 }
 
+.shield-button {
+  color: var(--muted);
+}
+
+.shield-button.active {
+  color: var(--brand-strong);
+}
+
+.shield-button.inactive {
+  color: #c7c3d6;
+}
+
+.shield-icon {
+  display: block;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -459,6 +475,215 @@ body {
   }
 }
 
+/* ----------------------------------------------------------- shield panel */
+
+.shield-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 300px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(30, 27, 46, 0.16);
+}
+
+.shield-panel[hidden] {
+  display: none;
+}
+
+.shield-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shield-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.shield-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.shield-badge-on {
+  color: var(--secure);
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.shield-badge-off {
+  color: var(--muted);
+  background: rgba(107, 114, 128, 0.14);
+}
+
+.shield-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-chrome);
+}
+
+.shield-stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shield-stat dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.shield-stat dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.shield-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shield-setting-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.shield-setting-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 170px;
+}
+
+.shield-select {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.shield-select:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.shield-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.shield-action-btn {
+  flex: 1 1 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.shield-action-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.shield-action-btn:disabled {
+  color: #c7c3d6;
+  cursor: default;
+}
+
+.shield-action-btn.shield-toggle-off {
+  border-color: var(--border);
+}
+
+.shield-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.shield-close:hover {
+  background: rgba(30, 27, 46, 0.08);
+  color: var(--fg);
+}
+
+.site-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shield-toggle-btn {
+  min-width: 44px;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.shield-toggle-btn:hover {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
 /* --------------------------------------------------------------------- menus */
 
 .menu,
@@ -526,7 +751,10 @@ body {
 .tab:focus-visible,
 .tab-close:focus-visible,
 .menu button:focus-visible,
-.context-menu button:focus-visible {
+.context-menu button:focus-visible,
+.shield-action-btn:focus-visible,
+.shield-toggle-btn:focus-visible,
+.shield-close:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 1px;
 }

@@ -55,6 +55,10 @@ wire the contracts into their platform.
 - **`core/src/privacy`** — content-filtering contracts and the reference
   engine. The engine contract is the seam where a future high-performance
   filter will plug in.
+- **`core/src/shield`** — the SHODASHA Shield foundation: pure, host-agnostic
+  request model, rule engine (domain/hostname), allowlist, filter-category and
+  protection-mode models, blocklist parsing, and aggregate session statistics.
+  It performs no I/O and never fabricates or stores per-request history.
 - **`core/src/security`** — secret loading, bounded secret reads, and
   redaction helpers.
 - **`core/src/storage`** — interfaces (`KeyValueStore`, `EncryptedStore`) that
@@ -62,15 +66,26 @@ wire the contracts into their platform.
 - **`core/src/logging`** — structured logger that refuses sensitive topics.
 - **`apps/desktop/src/main`** — Electron main process: lifecycle and hardened
   window creation.
+- **`apps/desktop/src/main/shieldCoordinator`** — wires the core Shield into
+  Electron's request pipeline (`webRequest.onBeforeRequest`): builds a
+  `ShieldRequest` per filterable request, evaluates it against the active
+  site's settings, cancels only blocked requests, and pushes throttled panel
+  state to the renderer while subscribed.
 - **`apps/desktop/src/preload`** — isolated preload bridge.
 - **`apps/desktop/src/renderer`** — sandboxed UI.
 
 ## Content filtering seam
 
-Content filtering is not implemented yet, but the architecture already defines
-where it lives. The host will wire the core's `ContentFilterEngine` into the
-browser's request pipeline using legitimate declarative network rules. Because
-the contract is host-agnostic, the Android host can reuse the same engine.
+The Shield foundation (`core/src/shield`) is the host-agnostic engine: it takes
+a structured `ShieldRequest` and returns a deterministic decision
+(`allow` / `block` / `allowlisted` / `unknown`) using only active-category
+rules and the user's allowlist. Blocking is always rule-based; the Shield never
+treats third-party requests as blockable by themselves. On desktop the
+`ShieldCoordinator` maps each Electron request into this model and cancels
+requests whose decision is `block`. Because the contract is host-agnostic, the
+Android host can reuse the same engine behind a WebView. List loading and
+high-performance matching plug in through the `FilterListSource` and
+`RuleEngine` interfaces without touching the decision model.
 
 ## Path to Android / Google Play
 

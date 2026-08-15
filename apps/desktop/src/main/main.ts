@@ -11,12 +11,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Logger, TabManager } from '@shodasha/core';
 import { BrowserController } from './browserController.js';
+import { ShieldCoordinator } from './shieldCoordinator.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const logger = new Logger({ level: 'info' });
 
 let controller: BrowserController | null = null;
+let shield: ShieldCoordinator | null = null;
 
 /**
  * Hardened WebPreferences for the chrome UI. Context isolation is on, node
@@ -58,6 +60,12 @@ function createMainWindow(): BrowserWindow {
   const manager = new TabManager();
   controller = new BrowserController({ window: win, manager });
   controller.init();
+
+  shield ??= new ShieldCoordinator({
+    session: win.webContents.session,
+    chrome: win.webContents,
+  });
+  shield.attachManager(manager);
 
   win.on('closed', () => {
     controller?.dispose();
