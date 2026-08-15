@@ -183,4 +183,188 @@ describe('TabManager', () => {
       expect(count).toBe(0);
     });
   });
+
+  describe('tab ordering', () => {
+    it('appends new tabs at the end (right-to-left order)', () => {
+      const manager = new TabManager();
+      const a = manager.createTab();
+      const b = manager.createTab();
+      const c = manager.createTab();
+      expect(manager.list.map((t) => t.id)).toEqual([a, b, c]);
+    });
+  });
+
+  describe('duplicate tab', () => {
+    it('copies url, title, favicon and becomes active', () => {
+      const manager = new TabManager();
+      const source = manager.createTab({ url: 'https://a.com' });
+      manager.setTitle(source, 'A');
+      manager.setFavicon(source, 'https://a.com/favicon.ico');
+      const dup = manager.duplicateTab(source);
+      expect(dup).not.toBeNull();
+      const copy = manager.getTab(dup ?? '');
+      expect(copy?.url).toBe('https://a.com');
+      expect(copy?.title).toBe('A');
+      expect(copy?.favicon).toBe('https://a.com/favicon.ico');
+      expect(copy?.active).toBe(true);
+    });
+
+    it('inserts the copy directly after the source tab', () => {
+      const manager = new TabManager();
+      const a = manager.createTab({ url: 'https://a.com' });
+      const b = manager.createTab({ url: 'https://b.com' });
+      const dup = manager.duplicateTab(a);
+      const ids = manager.list.map((t) => t.id);
+      expect(ids.indexOf(dup ?? '')).toBe(ids.indexOf(a) + 1);
+      expect(manager.size).toBe(3);
+      expect(manager.getTab(b)).not.toBeNull();
+    });
+
+    it('returns null for a missing tab', () => {
+      const manager = new TabManager();
+      manager.createTab();
+      expect(manager.duplicateTab('nope')).toBeNull();
+    });
+  });
+
+  describe('reopen closed tab', () => {
+    it('reopens the most recently closed tab with its state', () => {
+      const manager = new TabManager();
+      const a = manager.createTab({ url: 'https://a.com' });
+      manager.setTitle(a, 'A');
+      manager.setFavicon(a, 'https://a.com/favicon.ico');
+      manager.beginNavigation(a, 'https://b.com');
+      manager.closeTab(a);
+      expect(manager.size).toBe(0);
+
+      const id = manager.reopenClosedTab();
+      expect(id).not.toBeNull();
+      const tab = manager.getTab(id ?? '');
+      expect(tab?.url).toBe('https://b.com');
+      expect(tab?.title).toBe('A');
+      expect(tab?.favicon).toBe('https://a.com/favicon.ico');
+      expect(tab?.active).toBe(true);
+      expect(manager.size).toBe(1);
+    });
+
+    it('restores navigation history of a reopened tab', () => {
+      const manager = new TabManager();
+      const a = manager.createTab({ url: 'https://a.com' });
+      manager.beginNavigation(a, 'https://b.com');
+      manager.beginNavigation(a, 'https://c.com');
+      manager.navigateHistory(a, 'back'); // at b.com
+      manager.closeTab(a);
+
+      const id = manager.reopenClosedTab();
+      const tab = manager.getTab(id ?? '');
+      expect(tab?.url).toBe('https://b.com');
+      expect(manager.canGoBackFor(id ?? '')).toBe(true);
+      expect(manager.canGoForwardFor(id ?? '')).toBe(true);
+    });
+
+    it('does not track blank tabs for reopening', () => {
+      const manager = new TabManager();
+      manager.createTab(); // blank new tab
+      manager.createTab(); // blank new tab
+      expect(manager.canReopenClosedTab).toBe(false);
+      expect(manager.reopenClosedTab()).toBeNull();
+    });
+
+    it('returns null when there is nothing to reopen', () => {
+      const manager = new TabManager();
+      expect(manager.reopenClosedTab()).toBeNull();
+      expect(manager.canReopenClosedTab).toBe(false);
+    });
+
+    it('tracks closed tabs after a close', () => {
+      const manager = new TabManager();
+      const a = manager.createTab({ url: 'https://a.com' });
+      expect(manager.canReopenClosedTab).toBe(false);
+      manager.closeTab(a);
+      expect(manager.canReopenClosedTab).toBe(true);
+    });
+
+    it('bounds the number of remembered closed tabs', () => {
+      const manager = new TabManager();
+      for (let i = 0; i < 25; i += 1) {
+        const id = manager.createTab({ url: `https://site${i}.com` });
+        manager.closeTab(id);
+      }
+      // Only the most recent MAX_CLOSED_TABS are retained.
+      expect(manager.canReopenClosedTab).toBe(true);
+      const first = manager.reopenClosedTab();
+      const tab = manager.getTab(first ?? '');
+      expect(tab?.url).toBe('https://site24.com');
+    });
+  });
+
+  describe('close other tabs', () => {
+    it('closes all tabs except the given one', () => {
+      const manager = new TabManager();
+      const a = manager.createTab({ url: 'https://a.com' });
+      const b = manager.createTab({ url: 'https://b.com' });
+      const c = manager.createTab({ url: 'https://c.com' });
+      manager.closeOtherTabs(b);
+      expect(manager.size).toBe(1);
+      expect(manager.getTab(b)).not.toBeNull();
+      expect(manager.getTab(a)).toBeNull();
+      expect(manager.getTab(c)).toBeNull();
+    });
+
+    it('closes every other tab when the kept tab is the newest (rightmost)', () => {
+      const manager = new TabManager();
+      const a = manager.createTab({ url: 'https://a.com' });
+      const b = manager.createTab({ url: 'https://b.com' });
+      const c = manager.createTab({ url: 'https://c.com' }); // active
+      manager.closeOtherTabs(c);
+      expect(manager.size).toBe(1);
+      expect(manager.getTab(c)).not.toBeNull();
+      expect(manager.getTab(a)).toBeNull();
+      expect(manager.getTab(b)).toBeNull();
+    });
+
+    it('makes the kept tab active', () => {
+      const manager = new TabManager();
+      const a = manager.createTab({ url: 'https://a.com' });
+      const b = manager.createTab({ url: 'https://b.com' }); // active
+      manager.closeOtherTabs(a);
+      expect(manager.activeTab?.id).toBe(a);
+    });
+
+    it('ignores a missing tab', () => {
+      const manager = new TabManager();
+      manager.createTab({ url: 'https://a.com' });
+      manager.closeOtherTabs('nope');
+      expect(manager.size).toBe(1);
+    });
+  });
+
+  describe('close tabs to the right', () => {
+    it('closes tabs positioned to the right of the given tab', () => {
+      const manager = new TabManager();
+      const a = manager.createTab({ url: 'https://a.com' });
+      const b = manager.createTab({ url: 'https://b.com' });
+      const c = manager.createTab({ url: 'https://c.com' });
+      manager.closeTabsToRight(a);
+      expect(manager.size).toBe(1);
+      expect(manager.getTab(a)).not.toBeNull();
+      expect(manager.getTab(b)).toBeNull();
+      expect(manager.getTab(c)).toBeNull();
+    });
+
+    it('activates the kept tab when the active tab was to the right', () => {
+      const manager = new TabManager();
+      const a = manager.createTab({ url: 'https://a.com' });
+      const b = manager.createTab({ url: 'https://b.com' }); // active
+      manager.closeTabsToRight(a);
+      expect(manager.activeTab?.id).toBe(a);
+    });
+
+    it('ignores a missing tab', () => {
+      const manager = new TabManager();
+      manager.createTab({ url: 'https://a.com' });
+      manager.closeTabsToRight('nope');
+      expect(manager.size).toBe(1);
+    });
+  });
 });

@@ -27,6 +27,18 @@ export type TabEvent =
 /** Listener for tab events. */
 export type TabListener = (event: TabEvent) => void;
 
+/** Maximum number of recently-closed tabs remembered for "Reopen closed tab". */
+export const MAX_CLOSED_TABS = 20;
+
+/** Snapshot of a tab that was closed, enough to restore it on reopen. */
+interface ClosedTab {
+  readonly url: string;
+  readonly title: string;
+  readonly favicon: string | null;
+  readonly securityState: SecurityState;
+  readonly history: NavigationHistory;
+}
+
 export interface CreateTabOptions {
   /** Initial URL to load (may be empty for a blank tab). */
   readonly url?: string;
@@ -44,9 +56,10 @@ function createId(): string {
 export class TabManager {
   private readonly tabs: Tab[] = [];
   private activeTabId: string | null = null;
+  private readonly closedTabs: ClosedTab[] = [];
   private readonly listeners = new Set<TabListener>();
 
-  /** All tabs, most recently created first. */
+  /** All tabs, in creation order (oldest first, the left-to-right order). */
   public get list(): readonly Tab[] {
     return this.tabs;
   }
@@ -100,7 +113,7 @@ export class TabManager {
       history:
         url.length > 0 ? { entries: [url], index: 0 } : emptyHistory(),
     };
-    this.tabs.unshift(tab);
+    this.tabs.push(tab);
     this.emit({ type: 'tabs-changed' });
     if (options.activate ?? true) {
       this.setActiveTab(id);
@@ -118,7 +131,7 @@ export class TabManager {
       return this.activeTabId;
     }
     const wasActive = this.tabs[index]?.active === true;
-    this.tabs.splice(index, 1);
+    this.removeTab(tabId);
 
     if (this.tabs.length === 0) {
       this.activeTabId = null;
@@ -137,6 +150,138 @@ export class TabManager {
     }
     this.emit({ type: 'tabs-changed' });
     return this.activeTabId;
+  }
+
+  /**
+   * Closes every tab except the one with the given id. The kept tab is made
+   * active. Tabs closed here are still candidates for "Reopen closed tab".
+   */
+  public closeOtherTabs(tabId: string): void {
+    if (this.getTab(tabId) === null) {
+      return;
+    }
+    // Iterate backwards so removal never shifts an unvisited index.
+    for (let i = this.tabs.length - 1; i >= 0; i -= 1) {
+      const tab = this.tabs[i];
+      if (tab !== undefined && tab.id !== tabId) {
+        this.removeTab(tab.id);
+      }
+    }
+    this.setActiveTab(tabId);
+    this.emit({ type: 'tabs-changed' });
+  }
+
+  /**
+   * Closes every tab positioned to the right of the given tab (later in the
+   * tab strip). If the active tab was one of the closed tabs, the kept tab is
+   * activated.
+   */
+  public closeTabsToRight(tabId: string): void {
+    const index = this.tabs.findIndex((t) => t.id === tabId);
+    if (index === -1) {
+      return;
+    }
+    for (let i = this.tabs.length - 1; i > index; i -= 1) {
+      const tab = this.tabs[i];
+      if (tab !== undefined) {
+        this.removeTab(tab.id);
+      }
+    }
+    if (this.activeTabId === null || this.getTab(this.activeTabId) === null) {
+      this.setActiveTab(tabId);
+    }
+    this.emit({ type: 'tabs-changed' });
+  }
+
+  /**
+   * Duplicates the given tab (URL, title, favicon, history) and inserts the
+   * copy directly to its right. The copy becomes the active tab.
+   *
+   * @returns The id of the new tab, or `null` when the source tab is missing.
+   */
+  public duplicateTab(tabId: string): string | null {
+    const index = this.tabs.findIndex((t) => t.id === tabId);
+    const source = this.tabs[index];
+    if (source === undefined) {
+      return null;
+    }
+    const id = createId();
+    const copy: Tab = {
+      id,
+      url: source.url,
+      title: source.title,
+      loading: false,
+      active: false,
+      favicon: source.favicon,
+      securityState: source.securityState,
+      error: null,
+      showErrorPage: false,
+      history: source.history,
+    };
+    this.tabs.splice(index + 1, 0, copy);
+    this.emit({ type: 'tabs-changed' });
+    this.setActiveTab(id);
+    return id;
+  }
+
+  /** Whether there is a recently-closed tab to reopen. */
+  public get canReopenClosedTab(): boolean {
+    return this.closedTabs.length > 0;
+  }
+
+  /**
+   * Reopens the most recently closed tab (e.g. Ctrl+Shift+T). The restored tab
+   * keeps its URL, title, favicon, and navigation history, and becomes active.
+   *
+   * @returns The id of the reopened tab, or `null` when nothing is available.
+   */
+  public reopenClosedTab(): string | null {
+    const closed = this.closedTabs.pop();
+    if (closed === undefined) {
+      return null;
+    }
+    const id = createId();
+    const tab: Tab = {
+      id,
+      url: closed.url,
+      title: closed.title,
+      loading: false,
+      active: false,
+      favicon: closed.favicon,
+      securityState: closed.securityState,
+      error: null,
+      showErrorPage: false,
+      history: closed.history,
+    };
+    this.tabs.push(tab);
+    this.emit({ type: 'tabs-changed' });
+    this.setActiveTab(id);
+    return id;
+  }
+
+  /**
+   * Removes a tab from the model, remembering it for "Reopen closed tab" when
+   * it is not a blank tab. Does not emit an event; callers emit once.
+   */
+  private removeTab(tabId: string): void {
+    const index = this.tabs.findIndex((t) => t.id === tabId);
+    const tab = this.tabs[index];
+    if (tab === undefined) {
+      return;
+    }
+    if (tab.url.length > 0) {
+      this.closedTabs.push({
+        url: tab.url,
+        title: tab.title,
+        favicon: tab.favicon,
+        securityState: tab.securityState,
+        history: tab.history,
+      });
+      if (this.closedTabs.length > MAX_CLOSED_TABS) {
+        this.closedTabs.shift();
+      }
+    }
+    this.tabs.splice(index, 1);
   }
 
   /** Makes the given tab the active tab. */

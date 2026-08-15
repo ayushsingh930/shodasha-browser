@@ -21,11 +21,21 @@ import { Logger, classifyAddressInput, buildSearchUrl, type TabManager } from '@
 import { DEFAULT_SEARCH_ENGINE } from '@shodasha/core';
 import { classifyLoadError } from '@shodasha/core';
 import type { NavigationError } from '@shodasha/core';
-import { IPC, type BrowserState, type TabViewState } from '../shared/browserState.js';
+import {
+  IPC,
+  isBlankTabUrl,
+  type BrowserState,
+  type TabViewState,
+} from '../shared/browserState.js';
+import {
+  shortcutActionFor,
+  type ShortcutAction,
+  type ShortcutInput,
+} from '../shared/shortcuts.js';
 import { buildErrorPage } from './errorPage.js';
 
 /** Height reserved for the chrome (toolbar + tab bar). */
-export const CHROME_HEIGHT = 96;
+export const CHROME_HEIGHT = 88;
 
 export interface BrowserControllerOptions {
   /** The owning window. */
@@ -107,6 +117,9 @@ export class BrowserController {
     ipcMain.handle(IPC.reload, () => {
       this.activeTabReload();
     });
+    ipcMain.handle(IPC.hardReload, () => {
+      this.activeTabHardReload();
+    });
     ipcMain.handle(IPC.stop, () => {
       this.activeTabStop();
     });
@@ -118,6 +131,27 @@ export class BrowserController {
     });
     ipcMain.handle(IPC.activateTab, (_e, id: unknown) => {
       this.activateTab(String(id));
+    });
+    ipcMain.handle(IPC.reloadTab, (_e, id: unknown) => {
+      this.reloadTab(String(id));
+    });
+    ipcMain.handle(IPC.duplicateTab, (_e, id: unknown) => {
+      this.duplicateTab(String(id));
+    });
+    ipcMain.handle(IPC.closeOtherTabs, (_e, id: unknown) => {
+      this.closeOtherTabs(String(id));
+    });
+    ipcMain.handle(IPC.closeTabsToRight, (_e, id: unknown) => {
+      this.closeTabsToRight(String(id));
+    });
+    ipcMain.handle(IPC.reopenClosedTab, () => {
+      this.reopenClosedTab();
+    });
+    ipcMain.handle(IPC.nextTab, () => {
+      this.nextTab();
+    });
+    ipcMain.handle(IPC.prevTab, () => {
+      this.prevTab();
     });
   }
 
@@ -153,11 +187,22 @@ export class BrowserController {
   private closeTab(id: string): void {
     const next = this.manager.closeTab(id);
     this.removeView(id);
-    if (next !== null) {
+    if (next === null) {
+      // Never leave the browser without a valid active tab; open a fresh one.
+      this.newTab();
+    } else {
       this.ensureView(next);
     }
     this.relayout();
     this.pushState();
+  }
+
+  private closeActiveTab(): void {
+    const active = this.manager.activeTab;
+    if (active === null) {
+      return;
+    }
+    this.closeTab(active.id);
   }
 
   private activateTab(id: string): void {
@@ -165,6 +210,103 @@ export class BrowserController {
       return;
     }
     this.manager.setActiveTab(id);
+    this.ensureView(id);
+    this.relayout();
+    this.pushState();
+  }
+
+  private nextTab(): void {
+    const order = this.manager.list.map((t) => t.id);
+    if (order.length === 0) {
+      return;
+    }
+    const activeId = this.manager.activeTab?.id ?? null;
+    const index = activeId === null ? -1 : order.indexOf(activeId);
+    const next = order[(index + 1) % order.length];
+    if (next !== undefined) {
+      this.activateTab(next);
+    }
+  }
+
+  private prevTab(): void {
+    const order = this.manager.list.map((t) => t.id);
+    if (order.length === 0) {
+      return;
+    }
+    const activeId = this.manager.activeTab?.id ?? null;
+    const index = activeId === null ? -1 : order.indexOf(activeId);
+    const prev = order[(index - 1 + order.length) % order.length];
+    if (prev !== undefined) {
+      this.activateTab(prev);
+    }
+  }
+
+  private duplicateTab(id: string): void {
+    const source = this.manager.getTab(id);
+    if (source === null) {
+      return;
+    }
+    const newId = this.manager.duplicateTab(id);
+    if (newId === null) {
+      return;
+    }
+    this.ensureView(newId);
+    const live = this.liveTabs.get(newId);
+    if (live !== undefined && !isBlankTabUrl(source.url)) {
+      this.loadInView(live, source.url, false);
+    }
+    this.relayout();
+    this.pushState();
+  }
+
+  private reloadTab(id: string): void {
+    const tab = this.liveTabs.get(id);
+    if (tab === undefined) {
+      return;
+    }
+    this.manager.setLoading(id, true);
+    tab.view.webContents.reload();
+    this.pushState();
+  }
+
+  private reopenClosedTab(): void {
+    const id = this.manager.reopenClosedTab();
+    if (id === null) {
+      return;
+    }
+    this.ensureView(id);
+    const tab = this.manager.getTab(id);
+    if (tab !== null && !isBlankTabUrl(tab.url)) {
+      const live = this.liveTabs.get(id);
+      if (live !== undefined) {
+        this.loadInView(live, tab.url, false);
+      }
+    }
+    this.relayout();
+    this.pushState();
+  }
+
+  private closeOtherTabs(id: string): void {
+    const before = this.manager.list.map((t) => t.id);
+    this.manager.closeOtherTabs(id);
+    for (const tid of before) {
+      if (this.manager.getTab(tid) === null) {
+        this.removeView(tid);
+      }
+    }
+    this.ensureView(id);
+    this.relayout();
+    this.pushState();
+  }
+
+  private closeTabsToRight(id: string): void {
+    const before = this.manager.list.map((t) => t.id);
+    this.manager.closeTabsToRight(id);
+    for (const tid of before) {
+      if (this.manager.getTab(tid) === null) {
+        this.removeView(tid);
+      }
+    }
     this.ensureView(id);
     this.relayout();
     this.pushState();
@@ -200,6 +342,20 @@ export class BrowserController {
     this.pushState();
   }
 
+  private activeTabHardReload(): void {
+    const active = this.manager.activeTab;
+    if (active === null) {
+      return;
+    }
+    const tab = this.liveTabs.get(active.id);
+    if (tab === undefined) {
+      return;
+    }
+    this.manager.setLoading(active.id, true);
+    tab.view.webContents.reloadIgnoringCache();
+    this.pushState();
+  }
+
   private activeTabStop(): void {
     const active = this.manager.activeTab;
     if (active === null) {
@@ -212,6 +368,44 @@ export class BrowserController {
     tab.view.webContents.stop();
     this.manager.setLoading(active.id, false);
     this.pushState();
+  }
+
+  // -------------------------------------------------------- shortcuts
+
+  private handleShortcut(action: ShortcutAction): void {
+    switch (action) {
+      case 'new-tab':
+        this.newTab();
+        break;
+      case 'close-tab':
+        this.closeActiveTab();
+        break;
+      case 'reopen-tab':
+        this.reopenClosedTab();
+        break;
+      case 'next-tab':
+        this.nextTab();
+        break;
+      case 'prev-tab':
+        this.prevTab();
+        break;
+      case 'focus-address':
+        this.focusAddressBar();
+        break;
+      case 'reload':
+        this.activeTabReload();
+        break;
+      case 'hard-reload':
+        this.activeTabHardReload();
+        break;
+    }
+  }
+
+  private focusAddressBar(): void {
+    if (this.chrome.isDestroyed()) {
+      return;
+    }
+    this.chrome.send(IPC.focusAddressBar);
   }
 
   // ------------------------------------------------------------- views
@@ -247,6 +441,24 @@ export class BrowserController {
 
   private wireView(live: LiveTab): void {
     const wc = live.view.webContents;
+
+    // Browser shortcuts apply even while a page has keyboard focus. Only the
+    // browser's own shortcuts are intercepted; everything else reaches the page.
+    wc.on('before-input-event', (event, input) => {
+      const inputView: ShortcutInput = {
+        key: input.key,
+        ctrl: input.control,
+        shift: input.shift,
+        alt: input.alt,
+        meta: input.meta,
+        type: input.type,
+      };
+      const action = shortcutActionFor(inputView);
+      if (action !== null) {
+        event.preventDefault();
+        this.handleShortcut(action);
+      }
+    });
 
     wc.on('did-start-loading', () => {
       this.manager.setLoading(live.id, true);
@@ -308,7 +520,7 @@ export class BrowserController {
     });
   }
 
-  private loadInView(live: LiveTab, url: string): void {
+  private loadInView(live: LiveTab, url: string, recordHistory = true): void {
     if (!isAllowedNavigationUrl(url)) {
       this.showErrorPage(
         live,
@@ -318,10 +530,17 @@ export class BrowserController {
       return;
     }
     live.lastRequestedUrl = url;
-    this.manager.beginNavigation(live.id, url);
+    if (recordHistory) {
+      this.manager.beginNavigation(live.id, url);
+    } else {
+      // Restored/duplicated tabs already carry their history; do not re-record.
+      this.manager.setUrl(live.id, url);
+      this.manager.setLoading(live.id, true);
+    }
     void live.view.webContents.loadURL(url).catch(() => {
       // did-fail-load will surface the user-facing error; swallow here.
     });
+    this.relayout();
   }
 
   private showErrorPage(
@@ -334,6 +553,7 @@ export class BrowserController {
     void live.view.webContents.loadURL(errorUrl).catch(() => {
       // The error page itself failing is not user-visible; ignore.
     });
+    this.relayout();
   }
 
   private removeView(id: string): void {
@@ -359,8 +579,15 @@ export class BrowserController {
       return;
     }
     for (const live of this.liveTabs.values()) {
-      const active = this.manager.getTab(live.id)?.active === true;
-      if (active) {
+      const tab = this.manager.getTab(live.id);
+      if (tab === null) {
+        live.view.setVisible(false);
+        continue;
+      }
+      // A blank tab renders the SHODASHA new-tab page in the chrome, so its
+      // view stays hidden until a real page is loaded.
+      const isBlank = tab.active && isBlankTabUrl(tab.url) && !tab.showErrorPage;
+      if (tab.active && !isBlank) {
         live.view.setBounds({ x: 0, y: CHROME_HEIGHT, width, height: height - CHROME_HEIGHT });
         live.view.setVisible(true);
       } else {
@@ -414,7 +641,11 @@ export class BrowserController {
       canGoBack: this.manager.canGoBackFor(tab.id),
       canGoForward: this.manager.canGoForwardFor(tab.id),
     }));
-    return { tabs, activeTabId: this.manager.activeTab?.id ?? null };
+    return {
+      tabs,
+      activeTabId: this.manager.activeTab?.id ?? null,
+      canReopenClosedTab: this.manager.canReopenClosedTab,
+    };
   }
 
   private pushState(): void {

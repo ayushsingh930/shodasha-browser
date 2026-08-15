@@ -9,6 +9,7 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src",
+    "test": "vitest run",
     "dev": "npm run build && electron .",
     "start": "electron ."
   },

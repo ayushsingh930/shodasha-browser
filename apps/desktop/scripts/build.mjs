@@ -36,7 +36,8 @@ function copy(relFrom, relTo) {
 }
 
 // 1) Type-check and compile. Invoke tsc through node to be cross-platform.
-execFileSync(process.execPath, [tscEntry, '-p', 'tsconfig.json'], {
+//    The build config excludes unit tests so they are not emitted to dist.
+execFileSync(process.execPath, [tscEntry, '-p', 'tsconfig.build.json'], {
   cwd: root,
   stdio: 'inherit',
 });

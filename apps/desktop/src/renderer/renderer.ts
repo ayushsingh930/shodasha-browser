@@ -2,14 +2,23 @@
  * SHODASHA desktop - renderer UI.
  *
  * Runs inside the sandboxed renderer with context isolation. It renders the
- * browser chrome (toolbar, tab bar, content area) from state pushed by the
- * main process, and sends user commands over the preload bridge.
+ * browser chrome (toolbar, tab bar, new-tab page, content area) from state
+ * pushed by the main process, and sends user commands over the preload bridge.
  *
  * Only the exposed `window.shodasha.browser` API is available; there is no
  * direct Node.js or filesystem access.
  */
 
-import type { BrowserState, TabViewState } from '../shared/browserState.js';
+import {
+  isBlankTabUrl,
+  type BrowserState,
+  type TabViewState,
+} from '../shared/browserState.js';
+import {
+  shortcutActionFor,
+  type ShortcutAction,
+  type ShortcutInput,
+} from '../shared/shortcuts.js';
 
 /** The bridge surface exposed by the preload script. */
 interface ShodashaBridge {
@@ -21,11 +30,20 @@ interface ShodashaBridge {
     goBack(): Promise<void>;
     goForward(): Promise<void>;
     reload(): Promise<void>;
+    hardReload(): Promise<void>;
     stop(): Promise<void>;
     newTab(): Promise<string>;
     closeTab(id: string): Promise<void>;
     activateTab(id: string): Promise<void>;
+    reloadTab(id: string): Promise<void>;
+    duplicateTab(id: string): Promise<string>;
+    closeOtherTabs(id: string): Promise<void>;
+    closeTabsToRight(id: string): Promise<void>;
+    reopenClosedTab(): Promise<string>;
+    nextTab(): Promise<void>;
+    prevTab(): Promise<void>;
     onStateChanged(callback: (state: BrowserState) => void): () => void;
+    onFocusAddressBar(callback: () => void): () => void;
   };
 }
 
@@ -48,12 +66,22 @@ const newTabButton = document.querySelector<HTMLButtonElement>('#btn-new-tab');
 const menuButton = document.querySelector<HTMLButtonElement>('#btn-menu');
 const tabBar = document.querySelector<HTMLElement>('#tab-bar');
 const contentFrame = document.querySelector<HTMLElement>('#content-frame');
+const progressBar = document.querySelector<HTMLElement>('#progress');
+const ntpPage = document.querySelector<HTMLElement>('#new-tab-page');
+const ntpSearch = document.querySelector<HTMLInputElement>('#ntp-search');
+const tabContextMenu = document.querySelector<HTMLElement>('#tab-context-menu');
 
 // ----------------------------------------------------------------------
 // State
 // ----------------------------------------------------------------------
-let currentState: BrowserState = { tabs: [], activeTabId: null };
+let currentState: BrowserState = {
+  tabs: [],
+  activeTabId: null,
+  canReopenClosedTab: false,
+};
 let addressEditing = false;
+let contextTabId: string | null = null;
+let lastActiveTabId: string | null = null;
 
 const bridge = window.shodasha?.browser;
 
@@ -74,6 +102,9 @@ function renderToolbar(state: BrowserState): void {
   }
   if (stopButton !== null) {
     stopButton.hidden = active?.loading !== true;
+  }
+  if (progressBar !== null) {
+    progressBar.classList.toggle('active', active?.loading === true);
   }
 
   // Only update the address bar when the user is not typing in it.
@@ -125,6 +156,7 @@ function renderTabs(state: BrowserState): void {
   if (tabBar === null) {
     return;
   }
+  tabBar.setAttribute('role', 'tablist');
   // Rebuild only the tab strip; this is cheap and avoids stale bindings.
   tabBar.replaceChildren();
 
@@ -139,20 +171,30 @@ function renderTabs(state: BrowserState): void {
 }
 
 function buildTabElement(tab: TabViewState): HTMLElement {
-  const el = document.createElement('button');
-  el.type = 'button';
-  el.className = 'tab' + (tab.active ? ' active' : '');
+  const el = document.createElement('div');
+  el.className =
+    'tab' +
+    (tab.active ? ' active' : '') +
+    (tab.showErrorPage ? ' errored' : '');
+  el.setAttribute('role', 'tab');
+  el.setAttribute('aria-selected', tab.active ? 'true' : 'false');
+  el.tabIndex = 0;
   el.dataset.tabId = tab.id;
   el.title = tab.title || tab.url || 'New tab';
 
   const favicon = document.createElement('span');
   favicon.className = 'tab-favicon';
-  favicon.textContent = tab.favicon ? '' : '\u25cb';
-  if (tab.favicon) {
+  favicon.setAttribute('aria-hidden', 'true');
+  if (tab.showErrorPage) {
+    favicon.textContent = '!';
+  } else if (tab.favicon) {
     const img = document.createElement('img');
     img.src = tab.favicon;
     img.alt = '';
+    img.loading = 'lazy';
     favicon.replaceChildren(img);
+  } else {
+    favicon.textContent = '\u25cb';
   }
   el.appendChild(favicon);
 
@@ -165,10 +207,12 @@ function buildTabElement(tab: TabViewState): HTMLElement {
     el.classList.add('loading');
   }
 
-  const close = document.createElement('span');
+  const close = document.createElement('button');
+  close.type = 'button';
   close.className = 'tab-close';
   close.textContent = '\u00d7';
   close.title = 'Close tab';
+  close.setAttribute('aria-label', 'Close tab');
   close.addEventListener('click', (event) => {
     event.stopPropagation();
     void bridge?.closeTab(tab.id);
@@ -177,6 +221,16 @@ function buildTabElement(tab: TabViewState): HTMLElement {
 
   el.addEventListener('click', () => {
     void bridge?.activateTab(tab.id);
+  });
+  el.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      void bridge?.activateTab(tab.id);
+    }
+  });
+  el.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    openTabContextMenu(tab.id, event.clientX, event.clientY);
   });
 
   return el;
@@ -190,12 +244,20 @@ function renderContent(state: BrowserState): void {
     return;
   }
   const active = state.tabs.find((t) => t.id === state.activeTabId) ?? null;
+  const blank =
+    active !== null && isBlankTabUrl(active.url) && !active.showErrorPage;
+
+  if (blank) {
+    ntpPage?.removeAttribute('hidden');
+  } else {
+    ntpPage?.setAttribute('hidden', '');
+  }
+
   if (active === null) {
     contentFrame.classList.add('empty');
     contentFrame.replaceChildren();
     return;
   }
-  contentFrame.classList.remove('empty');
 
   if (active.showErrorPage && active.error) {
     contentFrame.classList.add('showing-error');
@@ -219,34 +281,112 @@ function buildErrorNotice(message: string): HTMLElement {
   return wrapper;
 }
 
+function maybeFocusNewTab(state: BrowserState): void {
+  const active = state.tabs.find((t) => t.id === state.activeTabId) ?? null;
+  const blank =
+    active !== null && isBlankTabUrl(active.url) && !active.showErrorPage;
+  if (active !== null && active.id !== lastActiveTabId && blank) {
+    focusNtpSearch();
+  }
+  lastActiveTabId = active?.id ?? null;
+}
+
+function focusNtpSearch(): void {
+  if (ntpSearch === null) {
+    return;
+  }
+  ntpSearch.focus();
+  ntpSearch.select();
+}
+
 // ----------------------------------------------------------------------
 // Actions
 // ----------------------------------------------------------------------
-function submitAddress(): void {
-  if (addressInput === null || bridge === undefined) {
+function submitAddress(value: string): void {
+  if (bridge === undefined) {
     return;
   }
-  const value = addressInput.value;
-  if (value.trim().length === 0) {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return;
+  }
+  void bridge.submitAddress(trimmed);
+}
+
+function submitFromAddressBar(): void {
+  if (addressInput === null) {
     return;
   }
   addressEditing = false;
   addressInput.blur();
-  void bridge.submitAddress(value);
+  submitAddress(addressInput.value);
 }
 
+function focusAddressInput(): void {
+  if (addressInput === null) {
+    return;
+  }
+  addressEditing = true;
+  addressInput.focus();
+  addressInput.select();
+}
+
+function dispatchShortcut(action: ShortcutAction): void {
+  switch (action) {
+    case 'new-tab':
+      void bridge?.newTab();
+      break;
+    case 'close-tab':
+      if (currentState.activeTabId !== null) {
+        void bridge?.closeTab(currentState.activeTabId);
+      }
+      break;
+    case 'reopen-tab':
+      void bridge?.reopenClosedTab();
+      break;
+    case 'next-tab':
+      void bridge?.nextTab();
+      break;
+    case 'prev-tab':
+      void bridge?.prevTab();
+      break;
+    case 'focus-address':
+      focusAddressInput();
+      break;
+    case 'reload':
+      void bridge?.reload();
+      break;
+    case 'hard-reload':
+      void bridge?.hardReload();
+      break;
+  }
+}
+
+// ----------------------------------------------------------------------
+// Event wiring
+// ----------------------------------------------------------------------
 function attachToolbarHandlers(): void {
-  backButton?.addEventListener('click', () => void bridge?.goBack());
-  forwardButton?.addEventListener('click', () => void bridge?.goForward());
-  reloadButton?.addEventListener('click', () => void bridge?.reload());
-  stopButton?.addEventListener('click', () => void bridge?.stop());
-  newTabButton?.addEventListener('click', () => void bridge?.newTab());
+  backButton?.addEventListener('click', () => {
+    void bridge?.goBack();
+  });
+  forwardButton?.addEventListener('click', () => {
+    void bridge?.goForward();
+  });
+  reloadButton?.addEventListener('click', () => {
+    void bridge?.reload();
+  });
+  stopButton?.addEventListener('click', () => {
+    void bridge?.stop();
+  });
+  newTabButton?.addEventListener('click', () => {
+    void bridge?.newTab();
+  });
   menuButton?.addEventListener('click', toggleMenu);
 
   addressInput?.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      submitAddress();
+      submitFromAddressBar();
     }
   });
   addressInput?.addEventListener('focus', () => {
@@ -266,17 +406,16 @@ function attachToolbarHandlers(): void {
   });
 }
 
-function attachMenuHandlers(): void {
-  const menu = document.querySelector<HTMLElement>('#menu');
-  if (menu === null) {
-    return;
-  }
-  menu.addEventListener('click', (event) => {
-    const target = event.target as HTMLElement | null;
-    const action = target?.dataset.action;
-    if (action !== undefined) {
-      handleMenuAction(action);
+function attachNtpHandlers(): void {
+  ntpSearch?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitAddress(ntpSearch.value);
+      ntpSearch.value = '';
     }
+  });
+  ntpSearch?.addEventListener('focus', () => {
+    ntpSearch.select();
   });
 }
 
@@ -321,12 +460,146 @@ function handleMenuAction(action: string): void {
     case 'reload':
       void bridge?.reload();
       break;
+    case 'reopen-closed':
+      void bridge?.reopenClosedTab();
+      break;
   }
   const menu = document.querySelector<HTMLElement>('#menu');
   if (menu !== null) {
     menu.classList.remove('open');
     menu.hidden = true;
   }
+}
+
+function attachMenuHandlers(): void {
+  const menu = document.querySelector<HTMLElement>('#menu');
+  if (menu === null) {
+    return;
+  }
+  menu.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement | null;
+    const action = target?.dataset.action;
+    if (action !== undefined) {
+      handleMenuAction(action);
+    }
+  });
+}
+
+// ----------------------------------------------------------------------
+// Tab context menu
+// ----------------------------------------------------------------------
+function openTabContextMenu(tabId: string, x: number, y: number): void {
+  contextTabId = tabId;
+  if (tabContextMenu === null) {
+    return;
+  }
+  const reopen = tabContextMenu.querySelector<HTMLButtonElement>(
+    '[data-action="reopen-closed"]',
+  );
+  if (reopen !== null) {
+    reopen.disabled = !currentState.canReopenClosedTab;
+  }
+  tabContextMenu.hidden = false;
+  tabContextMenu.classList.add('open');
+  const rect = tabContextMenu.getBoundingClientRect();
+  const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8));
+  const top = Math.max(8, Math.min(y, window.innerHeight - rect.height - 8));
+  tabContextMenu.style.left = `${left.toFixed(0)}px`;
+  tabContextMenu.style.top = `${top.toFixed(0)}px`;
+
+  const close = () => {
+    closeTabContextMenu();
+    document.removeEventListener('click', close);
+    document.removeEventListener('keydown', onEscape);
+  };
+  const onEscape = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      close();
+    }
+  };
+  setTimeout(() => {
+    document.addEventListener('click', close);
+    document.addEventListener('keydown', onEscape);
+  }, 0);
+}
+
+function closeTabContextMenu(): void {
+  if (tabContextMenu === null) {
+    return;
+  }
+  tabContextMenu.classList.remove('open');
+  tabContextMenu.hidden = true;
+  contextTabId = null;
+}
+
+function handleTabMenuAction(action: string): void {
+  const tabId = contextTabId;
+  switch (action) {
+    case 'new-tab':
+      void bridge?.newTab();
+      break;
+    case 'reload-tab':
+      if (tabId !== null) {
+        void bridge?.reloadTab(tabId);
+      }
+      break;
+    case 'duplicate-tab':
+      if (tabId !== null) {
+        void bridge?.duplicateTab(tabId);
+      }
+      break;
+    case 'close-tab':
+      if (tabId !== null) {
+        void bridge?.closeTab(tabId);
+      }
+      break;
+    case 'close-others':
+      if (tabId !== null) {
+        void bridge?.closeOtherTabs(tabId);
+      }
+      break;
+    case 'close-right':
+      if (tabId !== null) {
+        void bridge?.closeTabsToRight(tabId);
+      }
+      break;
+    case 'reopen-closed':
+      void bridge?.reopenClosedTab();
+      break;
+  }
+  closeTabContextMenu();
+}
+
+function attachTabContextMenuHandlers(): void {
+  tabContextMenu?.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement | null;
+    const action = target?.dataset.action;
+    if (action !== undefined) {
+      handleTabMenuAction(action);
+    }
+  });
+}
+
+// ----------------------------------------------------------------------
+// Keyboard shortcuts (chrome focus)
+// ----------------------------------------------------------------------
+function attachShortcutHandlers(): void {
+  document.addEventListener('keydown', (event) => {
+    const input: ShortcutInput = {
+      key: event.key,
+      ctrl: event.ctrlKey,
+      shift: event.shiftKey,
+      alt: event.altKey,
+      meta: event.metaKey,
+      type: event.type,
+    };
+    const action = shortcutActionFor(input);
+    if (action === null) {
+      return;
+    }
+    event.preventDefault();
+    dispatchShortcut(action);
+  });
 }
 
 // ----------------------------------------------------------------------
@@ -337,11 +610,16 @@ function applyState(state: BrowserState): void {
   renderToolbar(state);
   renderTabs(state);
   renderContent(state);
+  maybeFocusNewTab(state);
 }
 
 async function boot(): Promise<void> {
   attachToolbarHandlers();
+  attachNtpHandlers();
   attachMenuHandlers();
+  attachTabContextMenuHandlers();
+  attachShortcutHandlers();
+
   if (bridge === undefined) {
     const root = document.querySelector<HTMLElement>('#app');
     if (root !== null) {
@@ -350,6 +628,7 @@ async function boot(): Promise<void> {
     return;
   }
   bridge.onStateChanged(applyState);
+  bridge.onFocusAddressBar(focusAddressInput);
   const initial = await bridge.getState();
   applyState(initial);
 }

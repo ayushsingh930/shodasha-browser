@@ -42,7 +42,7 @@ export type {
   NavigationErrorKind,
 } from './navigation/errorPages.js';
 
-export { TabManager } from './navigation/tabManager.js';
+export { TabManager, MAX_CLOSED_TABS } from './navigation/tabManager.js';
 export type { TabEvent, TabListener, CreateTabOptions } from './navigation/tabManager.js';
 export type {
   Tab,

@@ -12,6 +12,8 @@
   </head>
   <body>
     <div id="app" class="browser">
+      <div id="progress" class="progress" aria-hidden="true"></div>
+
       <header class="toolbar">
         <div class="nav-controls">
           <button
@@ -84,6 +86,7 @@
             <button type="button" data-action="new-tab">New tab</button>
             <button type="button" data-action="close-tab">Close tab</button>
             <button type="button" data-action="reload">Reload</button>
+            <button type="button" data-action="reopen-closed">Reopen closed tab</button>
           </nav>
         </div>
       </header>
@@ -91,6 +94,34 @@
       <nav id="tab-bar" class="tab-bar" aria-label="Tabs"></nav>
 
       <main id="content-frame" class="content-frame"></main>
+
+      <section id="new-tab-page" class="new-tab-page" hidden>
+        <div class="ntp-mark" aria-hidden="true">S</div>
+        <h1 class="ntp-brand">SHODASHA</h1>
+        <p class="ntp-tagline">Private. Fast. Yours.</p>
+        <input
+          id="ntp-search"
+          class="ntp-search"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="Search or enter an address"
+          aria-label="Search or enter an address"
+        />
+        <p class="ntp-note">Your browsing stays on this device.</p>
+      </section>
+
+      <nav id="tab-context-menu" class="context-menu" hidden>
+        <button type="button" data-action="new-tab">New tab</button>
+        <button type="button" data-action="reload-tab">Reload tab</button>
+        <button type="button" data-action="duplicate-tab">Duplicate tab</button>
+        <button type="button" data-action="close-tab">Close tab</button>
+        <span class="menu-separator"></span>
+        <button type="button" data-action="close-others">Close other tabs</button>
+        <button type="button" data-action="close-right">Close tabs to the right</button>
+        <span class="menu-separator"></span>
+        <button type="button" data-action="reopen-closed">Reopen closed tab</button>
+      </nav>
     </div>
 
     <script type="module" src="./renderer.js"></script>
