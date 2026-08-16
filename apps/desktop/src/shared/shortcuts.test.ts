@@ -59,6 +59,16 @@ describe('shortcutActionFor', () => {
     ).toBe('toggle-bookmarks-bar');
   });
 
+  it('maps Ctrl+H to open-history', () => {
+    expect(shortcutActionFor(key({ key: 'h', ctrl: true }))).toBe('open-history');
+    expect(shortcutActionFor(key({ key: 'H', ctrl: true }))).toBe('open-history');
+    expect(shortcutActionFor(key({ key: 'h', meta: true }))).toBe('open-history');
+  });
+
+  it('does not map Ctrl+Shift+H to history', () => {
+    expect(shortcutActionFor(key({ key: 'h', ctrl: true, shift: true }))).toBeNull();
+  });
+
   it('maps F5 to reload', () => {
     expect(shortcutActionFor(key({ key: 'F5' }))).toBe('reload');
     expect(shortcutActionFor(key({ key: 'f5' }))).toBe('reload');

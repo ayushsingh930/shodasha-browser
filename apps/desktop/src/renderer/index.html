@@ -238,6 +238,7 @@
             <button type="button" data-action="reload">Reload</button>
             <button type="button" data-action="privacy-center">Privacy Center</button>
             <button type="button" data-action="bookmarks">Bookmarks</button>
+            <button type="button" data-action="history">History</button>
             <button type="button" data-action="reopen-closed">Reopen closed tab</button>
           </nav>
         </div>
@@ -479,6 +480,41 @@
         </div>
       </section>
 
+      <section id="history-manager" class="history-manager" hidden aria-label="SHODASHA History Manager">
+        <div class="history-manager-inner">
+          <header class="history-manager-header">
+            <div>
+              <h1 class="history-manager-title">History</h1>
+              <p class="history-manager-subtitle">Your browsing history is stored locally on this device.</p>
+            </div>
+            <div class="history-manager-controls">
+              <input
+                id="history-manager-search"
+                type="text"
+                placeholder="Search history"
+                aria-label="Search history"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <button type="button" id="history-manager-clear" class="privacy-btn">
+                Clear browsing data
+              </button>
+            </div>
+          </header>
+
+          <div id="history-manager-empty" class="history-empty" hidden>
+            <p class="history-empty-title">No browsing history</p>
+            <p class="history-empty-note">Pages you visit will appear here. History never leaves this device.</p>
+          </div>
+
+          <div id="history-manager-list" class="history-manager-scroll"></div>
+
+          <button type="button" id="history-manager-more" class="privacy-btn history-more" hidden>
+            Show more
+          </button>
+        </div>
+      </section>
+
       <section id="new-tab-page" class="new-tab-page" hidden>
         <div class="ntp-mark" aria-hidden="true">S</div>
         <h1 class="ntp-brand">SHODASHA</h1>
@@ -531,6 +567,53 @@
         </div>
       </div>
 
+      <div id="history-clear-dialog" class="dialog-backdrop" hidden>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="history-clear-dialog-title"
+          class="history-clear-dialog"
+        >
+          <h2 id="history-clear-dialog-title" class="history-clear-dialog-title">Clear browsing data</h2>
+          <p class="history-clear-dialog-note">
+            This clears visited pages from your local history. It does not affect
+            bookmarks, downloads, cookies, or settings.
+          </p>
+          <fieldset class="history-clear-ranges">
+            <legend class="visually-hidden">Time range</legend>
+            <label class="history-clear-range">
+              <input type="radio" name="history-clear-range" value="hour" />
+              <span>Last hour</span>
+            </label>
+            <label class="history-clear-range">
+              <input type="radio" name="history-clear-range" value="day" />
+              <span>Last 24 hours</span>
+            </label>
+            <label class="history-clear-range">
+              <input type="radio" name="history-clear-range" value="week" />
+              <span>Last 7 days</span>
+            </label>
+            <label class="history-clear-range">
+              <input type="radio" name="history-clear-range" value="month" />
+              <span>Last 4 weeks</span>
+            </label>
+            <label class="history-clear-range">
+              <input type="radio" name="history-clear-range" value="all" />
+              <span>All time</span>
+            </label>
+          </fieldset>
+          <div class="history-clear-dialog-actions">
+            <span class="bookmark-dialog-spacer"></span>
+            <button type="button" id="history-clear-dialog-cancel" class="privacy-btn">
+              Cancel
+            </button>
+            <button type="button" id="history-clear-dialog-confirm" class="privacy-btn privacy-btn-primary">
+              Clear
+            </button>
+          </div>
+        </div>
+      </div>
+
       <nav id="tab-context-menu" class="context-menu" hidden>
         <button type="button" data-action="new-tab">New tab</button>
         <button type="button" data-action="reload-tab">Reload tab</button>
@@ -541,6 +624,14 @@
         <button type="button" data-action="close-right">Close tabs to the right</button>
         <span class="menu-separator"></span>
         <button type="button" data-action="reopen-closed">Reopen closed tab</button>
+      </nav>
+
+      <nav id="history-item-menu" class="context-menu" hidden>
+        <button type="button" data-action="open">Open</button>
+        <button type="button" data-action="bookmark">Bookmark page</button>
+        <span class="menu-separator"></span>
+        <button type="button" data-action="clear-site">Clear history for this site</button>
+        <button type="button" data-action="remove">Remove entry</button>
       </nav>
     </div>
 

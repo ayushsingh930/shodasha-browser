@@ -15,7 +15,7 @@ wire the contracts into their platform.
                                 │  imports @shodasha/core
 ┌───────────────────────────────▼──────────────────────────────┐
 │                       packages/core                           │
-│  url/    privacy/    shield/    bookmarks/    security/        │
+│  url/    privacy/    shield/    bookmarks/    history/    security/        │
 │  storage/    logging/                                          │
 │  (pure TypeScript, platform-agnostic, strict)                  │
 └──────────────────────────────────────────────────────────────┘
@@ -70,6 +70,13 @@ wire the contracts into their platform.
   duplicate detection, local search/sort, and fail-safe persistence
   serialization. Pure and host-agnostic: bookmarks are never executed as
   code, and the manager performs no I/O.
+- **`core/src/history`** — the SHODASHA visit model and recorder: stable
+  per-tab `historyEntryId`s, title/favicon/timestamp capture, conservative
+  duplicate folding (same URL within a 5s window folds into the newest
+  entry), a bounded 10k-entry retention window, title/URL search, per-entry
+  deletion, per-site clearing, and fail-safe persistence serialization. Pure
+  and host-agnostic: only `http:`/`https:` visits are recorded, internal
+  pages are never recorded, and the recorder performs no I/O.
 - **`core/src/security`** — secret loading, bounded secret reads, and
   redaction helpers.
 - **`core/src/storage`** — interfaces (`KeyValueStore`, `EncryptedStore`) that
@@ -98,10 +105,26 @@ wire the contracts into their platform.
   state to the chrome UI (immediately for mutations, throttled with a trailing
   push for navigation changes), and notifies the layout of toolbar changes.
   Every renderer input is validated here in the main process.
+- **`apps/desktop/src/main/historyStore`** — debounced, atomic, fail-safe JSON
+  persistence for the visit log (a single `history.json` file); corrupt data
+  degrades to an empty log.
+- **`apps/desktop/src/main/historyCoordinator`** — owns the single source of
+  truth for history (the core `HistoryRecorder`) plus its persistence, and
+  exposes a narrow, validated IPC surface: state snapshots, search, per-entry
+  deletion, time-range clearing, and per-site clearing. It serializes the
+  privacy-safe list model (URL, title, favicon, visit count, latest visit) for
+  the chrome UI and keeps a ref-counted subscription while the History Manager
+  is visible. Every renderer input is validated here in the main process.
+- **`apps/desktop/src/main/browserController`** — owns live tabs and
+  navigation. Records genuine `http:`/`https:` page loads as visits
+  (`did-navigate` / `did-navigate-in-page`), skipping internal pages, and
+  guards load events with a per-tab navigation sequence so a stale event from
+  an in-flight load can never overwrite a newer navigation (for example,
+  opening an internal page while a web page is still loading).
 - **`apps/desktop/src/preload`** — isolated preload bridge.
 - **`apps/desktop/src/renderer`** — sandboxed UI (toolbar, tabs, NTP, Shield
-  popup, site-settings panel, and the chrome-rendered Privacy Center and
-  Bookmark Manager).
+  popup, site-settings panel, and the chrome-rendered Privacy Center, Bookmark
+  Manager, and History Manager).
 
 ## SHODASHA Shield — request filtering
 
@@ -278,6 +301,63 @@ toolbar-visibility preference is kept in a separate `bookmarks-ui.json` so the
 collection format stays pure. Deleting a folder moves its bookmarks to the
 root — bookmarks are never lost. Bookmarks are stored locally on the device
 and are never sent anywhere.
+
+## SHODASHA History Manager
+
+The History Manager is a chrome-rendered internal page at `shodasha://history`
+(no custom scheme registration — it is a model-level URL, like the Privacy
+Center and Bookmark Manager). Visit history is owned by a **single source of
+truth**: the core `HistoryRecorder` held by the `HistoryCoordinator` in the
+main process.
+
+### Data model
+
+History is an ordered log of visits (`packages/core/src/history/`). Each entry
+records the page URL (only `http:`/`https:`, normalized for display but never
+rewritten), the page title, an optional favicon URL, the first and latest visit
+timestamps, and a running visit count. Entries carry a stable id derived from
+their URL so repeated visits update one entry; reloads within a 5-second
+window (`DUPLICATE_WINDOW_MS`) fold into the newest entry to keep the log
+noisy-free.
+
+### Recording boundary
+
+- The `browserController` records genuine main-frame page loads
+  (`did-navigate` and `did-navigate-in-page`) for the active tab. Only
+  `http:`/`https:` URLs are recorded; SHODASHA internal pages
+  (`shodasha://privacy`, `shodasha://bookmarks`, `shodasha://history`,
+  `shodasha://ntp`) and `about:` pages are never recorded, and dangerous
+  schemes are rejected before recording.
+- Title and favicon are attached to the open entry as the page reports them;
+  the favicon is only ever used as an `<img>` source.
+- A per-tab navigation sequence (bumped on every navigation initiation) makes
+  stale load events harmless: if an in-flight web load is superseded by a
+  newer navigation (for example, opening an internal page while a page is
+  still loading), its late `did-navigate` is ignored rather than overwriting
+  the newer page.
+
+### Retention and clearing
+
+- The recorder keeps a bounded 10k-entry window, trimming oldest-first as new
+  visits arrive (so history never grows without bound).
+- The chrome UI offers search-by-title-or-URL, per-entry deletion, a
+  time-range clear (last hour, last 24 hours, last 7 days, last 30 days, all
+  time), and per-site clearing. Per-site clearing reuses the core's
+  conservative `sameSite` registrable-domain matching, so clearing
+  `example.com` also clears `www.example.com` but never
+  `example.com.evil.com`.
+- Every renderer input is validated in the main process; the renderer is never
+  trusted.
+
+### Persistence boundary
+
+History survives restarts via `HistoryStore`
+(`apps/desktop/src/main/historyStore.ts`): a `history.json` file in Electron's
+user-data directory, loaded fail-safely (corrupt data degrades to an empty
+log) and saved debounced (300 ms) with an atomic tmp+rename write, flushed on
+`before-quit`. The host-agnostic serialization lives in the core
+(`packages/core/src/history/historyPersistence.ts`). History is stored locally
+on the device and never leaves it — no sync, no telemetry.
 
 ## Content filtering seam
 

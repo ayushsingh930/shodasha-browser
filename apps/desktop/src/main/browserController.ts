@@ -24,6 +24,7 @@ import { classifyLoadError } from '@shodasha/core';
 import type { NavigationError } from '@shodasha/core';
 import {
   IPC,
+  HISTORY_URL,
   internalPageInfoFor,
   isBlankTabUrl,
   isInternalPageUrl,
@@ -36,6 +37,7 @@ import {
   type ShortcutInput,
 } from '../shared/shortcuts.js';
 import { buildErrorPage } from './errorPage.js';
+import type { HistoryRecorder } from './historyCoordinator.js';
 import {
   destroyViewSafely,
   handleViewDestroyed,
@@ -69,6 +71,12 @@ export interface BrowserControllerOptions {
    * leaves room for it below the tab bar.
    */
   readonly bookmarksBarVisible?: () => boolean;
+  /**
+   * Receives successful page navigations so the History Coordinator can record
+   * visits. Never called from page content; the URL, title, and favicon all
+   * come from trusted main-side events.
+   */
+  readonly historyRecorder?: HistoryRecorder;
 }
 
 /** A live tab: its core id plus its Electron view. */
@@ -84,6 +92,21 @@ interface LiveTab {
   attached: boolean;
   /** The last URL we explicitly navigated to (for error-page context). */
   lastRequestedUrl: string;
+  /**
+   * Bumped on every navigation initiation. Load events are only applied when
+   * their captured sequence still matches, so a stale event from an
+   * in-flight load can never overwrite a newer navigation (e.g. navigating to
+   * a SHODASHA internal page while a web page is still loading).
+   */
+  navSeq: number;
+  /** The sequence captured when the current webview load began. */
+  activeSeq: number;
+  /**
+   * The id of the history entry recorded for the current page load, or null
+   * when nothing recordable was loaded. Used to refresh the entry's title and
+   * favicon after the page reports them.
+   */
+  historyEntryId: string | null;
 }
 
 export class BrowserController {
@@ -94,6 +117,7 @@ export class BrowserController {
   private readonly onBookmarkPage: ((url: string, title: string) => void) | undefined;
   private readonly onToggleBookmarksBar: (() => void) | undefined;
   private readonly bookmarksBarVisible: (() => boolean) | undefined;
+  private readonly historyRecorder: HistoryRecorder | undefined;
   private readonly liveTabs = new Map<string, LiveTab>();
   private readonly chrome: WebContents;
   private readonly session: Session;
@@ -107,6 +131,7 @@ export class BrowserController {
     this.onBookmarkPage = options.onBookmarkPage;
     this.onToggleBookmarksBar = options.onToggleBookmarksBar;
     this.bookmarksBarVisible = options.bookmarksBarVisible;
+    this.historyRecorder = options.historyRecorder;
     this.logger = new Logger({ level: 'info' });
     this.chrome = options.window.webContents;
     this.session = this.chrome.session;
@@ -454,6 +479,9 @@ export class BrowserController {
       case 'toggle-bookmarks-bar':
         this.onToggleBookmarksBar?.();
         break;
+      case 'open-history':
+        this.openHistoryPage();
+        break;
     }
   }
 
@@ -462,6 +490,33 @@ export class BrowserController {
       return;
     }
     this.chrome.send(IPC.focusAddressBar);
+  }
+
+  /** Opens the SHODASHA History Manager in the active tab (Ctrl+H). */
+  private openHistoryPage(): void {
+    const active = this.manager.activeTab;
+    if (active === null) {
+      return;
+    }
+    this.navigateInternal(active.id, HISTORY_URL);
+  }
+
+  /**
+   * Reports a committed page navigation to the History Coordinator. The URL,
+   * title, and favicon are all trusted main-side values. A future private-tab
+   * feature will pass `{ private: true }` here so those visits are skipped.
+   */
+  private recordHistoryVisit(live: LiveTab, url: string): string | null {
+    const recorder = this.historyRecorder;
+    if (recorder === undefined) {
+      return null;
+    }
+    const tab = this.manager.getTab(live.id);
+    return recorder.recordVisit({
+      url,
+      title: tab?.title ?? '',
+      favicon: tab?.favicon ?? null,
+    });
   }
 
   // ------------------------------------------------------------- views
@@ -489,6 +544,9 @@ export class BrowserController {
       wc: view.webContents,
       attached: true,
       lastRequestedUrl: '',
+      navSeq: 0,
+      activeSeq: 0,
+      historyEntryId: null,
     };
     this.liveTabs.set(id, live);
     this.wireView(live);
@@ -537,15 +595,27 @@ export class BrowserController {
     });
 
     wc.on('did-navigate', (_e, url) => {
+      // Ignore load events from a navigation that has been superseded by a
+      // newer one (e.g. an in-flight web load when an internal page opened).
+      if (live.activeSeq !== live.navSeq) {
+        return;
+      }
       this.manager.setUrl(live.id, url);
       live.lastRequestedUrl = url;
       this.manager.setSecurityState(live.id, securityStateFor(url));
+      live.historyEntryId = this.recordHistoryVisit(live, url);
     });
 
     wc.on('did-navigate-in-page', (_e, url, isMainFrame) => {
       if (isMainFrame) {
+        if (live.activeSeq !== live.navSeq) {
+          return;
+        }
         this.manager.setUrl(live.id, url);
         this.manager.setSecurityState(live.id, securityStateFor(url));
+        // Same-document navigations are genuine page visits too; record them
+        // the same way a full navigation is recorded.
+        live.historyEntryId = this.recordHistoryVisit(live, url);
       }
     });
 
@@ -554,17 +624,26 @@ export class BrowserController {
       if (errorCode === -3) {
         return;
       }
+      if (live.activeSeq !== live.navSeq) {
+        return;
+      }
       const error = classifyLoadError(errorCode);
       this.showErrorPage(live, error, validatedUrl || live.lastRequestedUrl);
     });
 
     wc.on('page-title-updated', (_e, title) => {
       this.manager.setTitle(live.id, title);
+      if (live.historyEntryId !== null) {
+        this.historyRecorder?.updateVisitTitle(live.historyEntryId, title);
+      }
     });
 
     wc.on('page-favicon-updated', (_e, favicons) => {
       const favicon = favicons[0] ?? null;
       this.manager.setFavicon(live.id, favicon);
+      if (live.historyEntryId !== null) {
+        this.historyRecorder?.updateVisitFavicon(live.historyEntryId, favicon);
+      }
     });
 
     // Intercept navigations initiated by the page (links/scripts).
@@ -638,6 +717,10 @@ export class BrowserController {
       this.manager.setUrl(live.id, url);
       this.manager.setLoading(live.id, true);
     }
+    // Bump the navigation sequence so load events from a superseded load can
+    // never overwrite this newer navigation once it starts.
+    live.navSeq += 1;
+    live.activeSeq = live.navSeq;
     void live.wc.loadURL(url).catch(() => {
       // did-fail-load will surface the user-facing error; swallow here.
     });
@@ -653,6 +736,15 @@ export class BrowserController {
     const info = internalPageInfoFor(url);
     if (this.manager.getTab(tabId) === null || info === null) {
       return;
+    }
+    // Internal pages are rendered by the chrome UI, so no webview load begins.
+    // Bump the sequence: any in-flight webview load for this tab is now stale,
+    // and its load events must not overwrite the internal page. Do NOT adopt
+    // the new sequence as activeSeq — that stays with the abandoned webview
+    // load so its stale events are rejected by the equality guard.
+    const live = this.liveTabs.get(tabId);
+    if (live !== undefined) {
+      live.navSeq += 1;
     }
     if (recordHistory) {
       this.manager.beginNavigation(tabId, info.url);

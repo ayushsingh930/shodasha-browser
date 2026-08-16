@@ -23,6 +23,11 @@ working request filter (SHODASHA Shield) wired into the desktop browser.
       button, add/edit/delete/move/search, an optional bookmarks toolbar
       (Ctrl+Shift+B), and a chrome-rendered `shodasha://bookmarks` manager;
       stored locally on this device
+- ✅ SHODASHA History Manager — automatic local visit history with title,
+      favicon and visit-time capture, 10k-entry retention, dedupe of reloads
+      within a 5s window, search, per-entry delete, per-site clearing, and a
+      chrome-rendered `shodasha://history` manager (Ctrl+H); history never
+      leaves this device
 - ⏳ Tab management
 - ⏳ Password manager
 - ⏳ Android / Play Store packaging
@@ -66,6 +71,7 @@ npm run dev          # builds and launches the desktop shell (Electron)
 │   ├── src/shield/         SHODASHA Shield: rule engine, allowlist, modes,
 │   │                       stats & events (host-agnostic)
 │   ├── src/bookmarks/      Bookmark model, manager & persistence (host-agnostic)
+│   ├── src/history/        Visit model, recorder & retention (host-agnostic)
 │   ├── src/security/       Secret handling & redaction
 │   ├── src/storage/        Storage abstraction interfaces
 │   └── src/logging/        Privacy-safe structured logger

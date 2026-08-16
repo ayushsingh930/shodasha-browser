@@ -11,6 +11,9 @@ import type {
   BookmarkCollection,
   BookmarkSort,
   FilterListStatus,
+  HistoryDateGroup,
+  HistoryEntry,
+  HistoryGroup,
   SecurityState,
   ShieldFilterEvent,
   ShieldMode,
@@ -80,8 +83,11 @@ export const PRIVACY_CENTER_URL = 'shodasha://privacy';
 /** The internal URL of the SHODASHA Bookmark Manager. */
 export const BOOKMARKS_URL = 'shodasha://bookmarks';
 
+/** The internal URL of the SHODASHA History Manager. */
+export const HISTORY_URL = 'shodasha://history';
+
 /** The kinds of internal pages the chrome UI can render. */
-export type InternalPageKind = 'privacy' | 'bookmarks';
+export type InternalPageKind = 'privacy' | 'bookmarks' | 'history';
 
 /** Metadata for a SHODASHA internal page. */
 export interface InternalPageInfo {
@@ -103,6 +109,9 @@ export function internalPageInfoFor(url: string): InternalPageInfo | null {
   }
   if (normalized === BOOKMARKS_URL) {
     return { url: BOOKMARKS_URL, kind: 'bookmarks', title: 'Bookmarks' };
+  }
+  if (normalized === HISTORY_URL) {
+    return { url: HISTORY_URL, kind: 'history', title: 'History' };
   }
   return null;
 }
@@ -251,6 +260,160 @@ export function sortBookmarks(
   return copy;
 }
 
+// ---------------------------------------------------------------------
+// History (renderer-reachable pure helpers)
+//
+// The chrome renderer runs as a plain browser ES module and cannot import
+// `@shodasha/core` at runtime. These helpers mirror the authoritative core
+// logic so the History Manager can search and date-group entries locally,
+// on this device, with no remote service.
+// ---------------------------------------------------------------------
+
+/**
+ * The full history state pushed to the UI. It mirrors the single source of
+ * truth in the main process (the core HistoryManager), newest entry first.
+ */
+export interface HistoryState {
+  readonly entries: readonly HistoryEntry[];
+}
+
+/** Case-insensitive local search across history titles and URLs. */
+export function searchHistory(
+  entries: readonly HistoryEntry[],
+  query: string,
+): HistoryEntry[] {
+  const needle = query.trim().toLowerCase();
+  if (needle.length === 0) {
+    return [...entries];
+  }
+  return entries.filter((entry) => {
+    return (
+      entry.title.toLowerCase().includes(needle) ||
+      entry.url.toLowerCase().includes(needle)
+    );
+  });
+}
+
+/** The calendar day index of a timestamp in local time (DST-safe). */
+export function localHistoryDayIndex(timestamp: number): number {
+  return Math.floor(
+    (timestamp - new Date(timestamp).getTimezoneOffset() * 60_000) / 86_400_000,
+  );
+}
+
+/** The date group a visit belongs to, relative to `now`, in local time. */
+export function historyDateGroupFor(
+  visitedAt: number,
+  now: number,
+): HistoryDateGroup {
+  const diff = localHistoryDayIndex(now) - localHistoryDayIndex(visitedAt);
+  if (diff <= 0) {
+    return 'today';
+  }
+  if (diff === 1) {
+    return 'yesterday';
+  }
+  const daysSinceMonday = (new Date(now).getDay() + 6) % 7;
+  return diff <= daysSinceMonday ? 'earlier-week' : 'older';
+}
+
+/** The user-facing label for a history date group. */
+export function historyGroupLabel(group: HistoryDateGroup): string {
+  switch (group) {
+    case 'today':
+      return 'Today';
+    case 'yesterday':
+      return 'Yesterday';
+    case 'earlier-week':
+      return 'Earlier this week';
+    case 'older':
+      return 'Older';
+  }
+}
+
+/** Groups entries into date buckets in display order. */
+export function groupHistoryByDate(
+  entries: readonly HistoryEntry[],
+  now: number,
+): HistoryGroup[] {
+  const buckets = new Map<HistoryDateGroup, HistoryEntry[]>();
+  for (const entry of entries) {
+    const key = historyDateGroupFor(entry.visitedAt, now);
+    const list = buckets.get(key) ?? [];
+    list.push(entry);
+    buckets.set(key, list);
+  }
+  const order: HistoryDateGroup[] = [
+    'today',
+    'yesterday',
+    'earlier-week',
+    'older',
+  ];
+  const groups: HistoryGroup[] = [];
+  for (const key of order) {
+    const list = buckets.get(key);
+    if (list !== undefined && list.length > 0) {
+      groups.push({ key, label: historyGroupLabel(key), entries: list });
+    }
+  }
+  return groups;
+}
+
+/** Extracts the lowercased hostname from a history URL, or null. */
+export function hostnameFromHistoryUrl(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.toLowerCase();
+    return hostname.length === 0 ? null : hostname;
+  } catch {
+    return null;
+  }
+}
+
+/** A conservative normalized key used to match a URL to its bookmark. */
+function bookmarkKeyForUrl(url: string): string {
+  const trimmed = url.trim();
+  const lowered = trimmed.toLowerCase();
+  if (lowered === 'shodasha://privacy' || lowered === 'shodasha://bookmarks' || lowered === 'shodasha://history') {
+    return lowered;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return lowered;
+    }
+    const host = parsed.hostname.toLowerCase();
+    const defaultPort = parsed.protocol === 'https:' ? '443' : '80';
+    const port =
+      parsed.port !== '' && parsed.port !== defaultPort
+        ? `:${parsed.port}`
+        : '';
+    let path = parsed.pathname;
+    if (path.length > 1 && path.endsWith('/')) {
+      path = path.slice(0, -1);
+    }
+    if (path.length === 0) {
+      path = '/';
+    }
+    return `${parsed.protocol}//${host}${port}${path}${parsed.search}`;
+  } catch {
+    return lowered;
+  }
+}
+
+/**
+ * Finds the bookmark for a URL using the conservative dedupe key, or null.
+ * Lets the History Manager show the bookmarked state for an entry and open
+ * the editor instead of duplicating a bookmark.
+ */
+export function bookmarkForUrl(
+  bookmarks: readonly Bookmark[],
+  url: string,
+): Bookmark | null {
+  const key = bookmarkKeyForUrl(url);
+  return bookmarks.find((bookmark) => bookmarkKeyForUrl(bookmark.url) === key) ?? null;
+}
+
 /** IPC channel names used between renderer and main. */
 export const IPC = {
   getState: 'browser:get-state',
@@ -297,4 +460,11 @@ export const IPC = {
   bookmarkSearch: 'bookmarks:search',
   bookmarkSetToolbarVisible: 'bookmarks:set-toolbar-visible',
   bookmarkOpenAddDialog: 'bookmarks:open-add-dialog',
+  historyGetState: 'history:get-state',
+  historyStateChanged: 'history:state-changed',
+  historySearch: 'history:search',
+  historyDeleteEntry: 'history:delete-entry',
+  historyClear: 'history:clear',
+  historyClearRange: 'history:clear-range',
+  historyClearSite: 'history:clear-site',
 } as const;

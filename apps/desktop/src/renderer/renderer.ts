@@ -11,13 +11,19 @@
 
 import {
   BOOKMARKS_URL,
+  HISTORY_URL,
   PRIVACY_CENTER_URL,
+  bookmarkForUrl,
+  groupHistoryByDate,
+  hostnameFromHistoryUrl,
   internalPageInfoFor,
   isBlankTabUrl,
   searchBookmarks,
+  searchHistory,
   sortBookmarks,
   type BookmarkState,
   type BrowserState,
+  type HistoryState,
   type PrivacyCenterState,
   type ShieldPanelState,
   type TabViewState,
@@ -33,6 +39,7 @@ import type {
   BookmarkCollection,
   BookmarkFolder,
   BookmarkSort,
+  HistoryEntry,
   ShieldFilterEvent,
   ShieldMode,
   UpdateBookmarkResult,
@@ -105,6 +112,15 @@ interface ShodashaBridge {
     onOpenAddDialog(
       callback: (data: { url: string; title: string }) => void,
     ): () => void;
+  };
+  history: {
+    getState(): Promise<HistoryState>;
+    search(query: string): Promise<HistoryEntry[]>;
+    deleteEntry(id: string): Promise<boolean>;
+    clear(): Promise<number>;
+    clearRange(start: number, end: number): Promise<number>;
+    clearSite(site: string): Promise<number>;
+    onStateChanged(callback: (state: HistoryState) => void): () => void;
   };
 }
 
@@ -214,6 +230,30 @@ const bookmarkDialogError = document.querySelector<HTMLElement>('#bookmark-dialo
 const bookmarkDialogDelete = document.querySelector<HTMLButtonElement>('#bookmark-dialog-delete');
 const bookmarkDialogCancel = document.querySelector<HTMLButtonElement>('#bookmark-dialog-cancel');
 
+// History Manager elements.
+const historyManager = document.querySelector<HTMLElement>('#history-manager');
+const historyManagerSearch = document.querySelector<HTMLInputElement>('#history-manager-search');
+const historyManagerClear = document.querySelector<HTMLButtonElement>('#history-manager-clear');
+const historyManagerEmpty = document.querySelector<HTMLElement>('#history-manager-empty');
+const historyManagerList = document.querySelector<HTMLElement>('#history-manager-list');
+const historyManagerMore = document.querySelector<HTMLButtonElement>('#history-manager-more');
+const historyItemMenu = document.querySelector<HTMLElement>('#history-item-menu');
+const historyClearDialog = document.querySelector<HTMLElement>('#history-clear-dialog');
+const historyClearDialogCancel = document.querySelector<HTMLButtonElement>('#history-clear-dialog-cancel');
+const historyClearDialogConfirm = document.querySelector<HTMLButtonElement>('#history-clear-dialog-confirm');
+const historyClearRanges = document.querySelectorAll<HTMLInputElement>(
+  'input[name="history-clear-range"]',
+);
+
+// ----------------------------------------------------------------------
+// Constants
+// ----------------------------------------------------------------------
+/** How many history entries render before the "Show more" control. */
+const HISTORY_PAGE_SIZE = 100;
+
+/** The time ranges offered by the clear-history dialog. */
+type HistoryClearRange = 'hour' | 'day' | 'week' | 'month' | 'all';
+
 // ----------------------------------------------------------------------
 // State
 // ----------------------------------------------------------------------
@@ -232,6 +272,7 @@ const bridge = window.shodasha?.browser;
 const shieldBridge = window.shodasha?.shield;
 const privacyBridge = window.shodasha?.privacy;
 const bookmarksBridge = window.shodasha?.bookmarks;
+const historyBridge = window.shodasha?.history;
 let privacyCenterActive = false;
 let privacyUnsub: (() => void) | null = null;
 let privacyState: PrivacyCenterState | null = null;
@@ -244,6 +285,19 @@ let bookmarkDialogId: string | null = null;
 /** The current folder filter in the Bookmark Manager (null = all). */
 let managerFolderFilter: string | null = null;
 let managerSort: BookmarkSort = 'recent';
+
+// History state (single source of truth lives in the main process).
+let historyState: HistoryState | null = null;
+let historyManagerActive = false;
+/** Whether the History Manager was active in the previous render pass. */
+let historyWasActive = false;
+let historySearchQuery = '';
+/** How many entries are currently rendered (incremental loading). */
+let historyShownCount = HISTORY_PAGE_SIZE;
+/** The entry whose item menu is open, or null. */
+let historyMenuEntry: HistoryEntry | null = null;
+/** The selected time range in the clear-history dialog. */
+let historyClearSelection: HistoryClearRange = 'all';
 
 // ----------------------------------------------------------------------
 // Toolbar rendering
@@ -441,6 +495,29 @@ function renderContent(state: BrowserState): void {
     }
   }
 
+  // The History Manager is chrome-rendered, like the Bookmark Manager.
+  historyManagerActive = internalInfo?.kind === 'history';
+  if (historyManager !== null) {
+    if (historyManagerActive) {
+      if (!historyWasActive) {
+        // Fresh entry to the page: reset the incremental list and any search.
+        historyWasActive = true;
+        historyShownCount = HISTORY_PAGE_SIZE;
+        if (historySearchQuery.length > 0) {
+          historySearchQuery = '';
+          if (historyManagerSearch !== null) {
+            historyManagerSearch.value = '';
+          }
+        }
+      }
+      historyManager.removeAttribute('hidden');
+      renderHistoryManager();
+    } else {
+      historyWasActive = false;
+      historyManager.setAttribute('hidden', '');
+    }
+  }
+
   if (active === null) {
     contentFrame.classList.add('empty');
     contentFrame.replaceChildren();
@@ -549,6 +626,9 @@ function dispatchShortcut(action: ShortcutAction): void {
       break;
     case 'toggle-bookmarks-bar':
       toggleBookmarksBar();
+      break;
+    case 'open-history':
+      openHistoryManager();
       break;
   }
 }
@@ -659,6 +739,9 @@ function handleMenuAction(action: string): void {
       break;
     case 'bookmarks':
       openBookmarksManager();
+      break;
+    case 'history':
+      openHistoryManager();
       break;
   }
   const menu = document.querySelector<HTMLElement>('#menu');
@@ -953,6 +1036,12 @@ function openBookmarksManager(): void {
   void bridge?.submitAddress(BOOKMARKS_URL);
 }
 
+/** Navigates the active tab to the SHODASHA History Manager. */
+function openHistoryManager(): void {
+  closeShieldPanels();
+  void bridge?.submitAddress(HISTORY_URL);
+}
+
 // ----------------------------------------------------------------------
 // Bookmarks
 // ----------------------------------------------------------------------
@@ -964,6 +1053,11 @@ function applyBookmarkState(state: BookmarkState): void {
   renderBookmarksBar();
   if (bookmarkManagerActive) {
     renderBookmarksManager();
+  }
+  // The History Manager shows bookmarked indicators; refresh them when the
+  // bookmark collection changes so the state never goes stale.
+  if (historyManagerActive) {
+    renderHistoryManager();
   }
 }
 
@@ -1485,6 +1579,323 @@ function attachBookmarkHandlers(): void {
   });
 }
 
+// ----------------------------------------------------------------------
+// History Manager
+// ----------------------------------------------------------------------
+
+/** Applies history state pushed from the main process. */
+function applyHistoryState(state: HistoryState): void {
+  historyState = state;
+  if (historyManagerActive) {
+    renderHistoryManager();
+  }
+}
+
+function renderHistoryManager(): void {
+  if (historyManagerList === null || historyManagerEmpty === null) {
+    return;
+  }
+  const entries = searchHistory(historyState?.entries ?? [], historySearchQuery);
+  if (entries.length === 0) {
+    historyManagerEmpty.hidden = false;
+    historyManagerList.replaceChildren();
+    if (historyManagerMore !== null) {
+      historyManagerMore.hidden = true;
+    }
+    return;
+  }
+  historyManagerEmpty.hidden = true;
+  const visible = entries.slice(0, historyShownCount);
+  const groups = groupHistoryByDate(visible, Date.now());
+  const fragment = document.createDocumentFragment();
+  for (const group of groups) {
+    const heading = document.createElement('h3');
+    heading.className = 'history-group-title';
+    heading.textContent = group.label;
+    fragment.appendChild(heading);
+    const list = document.createElement('ul');
+    list.className = 'history-manager-list';
+    for (const entry of group.entries) {
+      list.appendChild(buildHistoryItem(entry));
+    }
+    fragment.appendChild(list);
+  }
+  historyManagerList.replaceChildren(fragment);
+  if (historyManagerMore !== null) {
+    historyManagerMore.hidden = visible.length >= entries.length;
+  }
+}
+
+function buildHistoryItem(entry: HistoryEntry): HTMLElement {
+  const li = document.createElement('li');
+  li.className = 'history-manager-item';
+
+  const favicon = document.createElement('span');
+  favicon.className = 'history-favicon';
+  favicon.setAttribute('aria-hidden', 'true');
+  if (entry.favicon !== null) {
+    const img = document.createElement('img');
+    img.src = entry.favicon;
+    img.alt = '';
+    img.loading = 'lazy';
+    favicon.replaceChildren(img);
+  }
+
+  const main = document.createElement('div');
+  main.className = 'history-manager-item-main';
+
+  const title = document.createElement('span');
+  title.className = 'history-manager-item-title';
+  title.textContent = entry.title.length > 0 ? entry.title : entry.url;
+
+  const url = document.createElement('span');
+  url.className = 'history-manager-item-url';
+  url.textContent = entry.url;
+  url.title = entry.url;
+
+  main.append(title, url);
+
+  const bookmarked =
+    bookmarkForUrl(bookmarkState?.collection.bookmarks ?? [], entry.url) !== null;
+  if (bookmarked) {
+    const star = document.createElement('span');
+    star.className = 'history-bookmarked';
+    star.textContent = '\u2605';
+    star.setAttribute('aria-label', 'Bookmarked');
+    star.title = 'Bookmarked';
+    li.appendChild(star);
+  }
+
+  const time = document.createElement('span');
+  time.className = 'history-manager-item-time';
+  time.textContent = formatHistoryTime(entry.visitedAt);
+  time.title = formatHistoryDate(entry.visitedAt);
+
+  const more = document.createElement('button');
+  more.type = 'button';
+  more.className = 'history-manager-more';
+  more.textContent = '\u22ef';
+  more.setAttribute('aria-label', 'More actions');
+  more.addEventListener('click', (event) => {
+    event.stopPropagation();
+    openHistoryItemMenu(entry, more);
+  });
+
+  li.append(favicon, main, time, more);
+  li.addEventListener('click', () => {
+    void bridge?.submitAddress(entry.url);
+  });
+  return li;
+}
+
+function formatHistoryTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatHistoryDate(ts: number): string {
+  return new Date(ts).toLocaleDateString([], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+// ----------------------------------------------------------- item menu
+
+function openHistoryItemMenu(entry: HistoryEntry, anchor: HTMLElement): void {
+  const menu = historyItemMenu;
+  if (menu === null) {
+    return;
+  }
+  historyMenuEntry = entry;
+  const bookmarkAction = menu.querySelector<HTMLButtonElement>(
+    '[data-action="bookmark"]',
+  );
+  const existing = bookmarkForUrl(
+    bookmarkState?.collection.bookmarks ?? [],
+    entry.url,
+  );
+  if (bookmarkAction !== null) {
+    bookmarkAction.textContent =
+      existing !== null ? 'Edit bookmark' : 'Bookmark page';
+  }
+  const rect = anchor.getBoundingClientRect();
+  menu.style.left = `${String(Math.min(rect.right, window.innerWidth - 200))}px`;
+  menu.style.top = `${String(rect.bottom + 4)}px`;
+  menu.hidden = false;
+
+  const close = (): void => {
+    menu.hidden = true;
+    historyMenuEntry = null;
+    document.removeEventListener('click', onDocClick);
+    document.removeEventListener('keydown', onEsc);
+    document.removeEventListener('scroll', onScroll, true);
+  };
+  const onDocClick = (event: MouseEvent): void => {
+    const target = event.target as Node | null;
+    if (target !== null && menu.contains(target)) {
+      return;
+    }
+    close();
+  };
+  const onEsc = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      close();
+    }
+  };
+  const onScroll = (): void => {
+    close();
+  };
+  setTimeout(() => {
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onEsc);
+    document.addEventListener('scroll', onScroll, true);
+  }, 0);
+}
+
+function closeHistoryItemMenu(): void {
+  if (historyItemMenu !== null) {
+    historyItemMenu.hidden = true;
+  }
+  historyMenuEntry = null;
+}
+
+function handleHistoryItemMenuAction(action: string): void {
+  const entry = historyMenuEntry;
+  closeHistoryItemMenu();
+  if (entry === null) {
+    return;
+  }
+  switch (action) {
+    case 'open':
+      void bridge?.submitAddress(entry.url);
+      break;
+    case 'bookmark': {
+      const existing = bookmarkForUrl(
+        bookmarkState?.collection.bookmarks ?? [],
+        entry.url,
+      );
+      if (existing !== null) {
+        showBookmarkDialog({
+          editing: existing,
+          url: existing.url,
+          title: existing.title,
+        });
+      } else {
+        showBookmarkDialog({
+          editing: null,
+          url: entry.url,
+          title: entry.title.length > 0 ? entry.title : entry.url,
+        });
+      }
+      break;
+    }
+    case 'clear-site': {
+      const hostname = hostnameFromHistoryUrl(entry.url);
+      if (hostname !== null) {
+        void historyBridge?.clearSite(hostname);
+      }
+      break;
+    }
+    case 'remove':
+      void historyBridge?.deleteEntry(entry.id);
+      break;
+  }
+}
+
+// ------------------------------------------------------- clear dialog
+
+function openClearHistoryDialog(): void {
+  if (historyClearDialog === null) {
+    return;
+  }
+  for (const radio of Array.from(historyClearRanges)) {
+    radio.checked = radio.value === historyClearSelection;
+  }
+  historyClearDialog.hidden = false;
+  historyClearDialogCancel?.focus();
+}
+
+function closeClearHistoryDialog(): void {
+  if (historyClearDialog !== null) {
+    historyClearDialog.hidden = true;
+  }
+}
+
+/** The start of the selected clear range, or null for "all time". */
+function clearRangeStart(range: HistoryClearRange, now: number): number | null {
+  switch (range) {
+    case 'hour':
+      return now - 3_600_000;
+    case 'day':
+      return now - 24 * 3_600_000;
+    case 'week':
+      return now - 7 * 24 * 3_600_000;
+    case 'month':
+      return now - 28 * 24 * 3_600_000;
+    case 'all':
+      return null;
+  }
+}
+
+function confirmClearHistory(): void {
+  const now = Date.now();
+  const start = clearRangeStart(historyClearSelection, now);
+  closeClearHistoryDialog();
+  if (start === null) {
+    void historyBridge?.clear();
+  } else {
+    void historyBridge?.clearRange(start, now);
+  }
+}
+
+function attachHistoryHandlers(): void {
+  historyManagerSearch?.addEventListener('input', () => {
+    historySearchQuery = historyManagerSearch.value;
+    historyShownCount = HISTORY_PAGE_SIZE;
+    renderHistoryManager();
+  });
+  historyManagerClear?.addEventListener('click', openClearHistoryDialog);
+  historyManagerMore?.addEventListener('click', () => {
+    historyShownCount += HISTORY_PAGE_SIZE;
+    renderHistoryManager();
+  });
+  historyItemMenu?.addEventListener('click', (event) => {
+    const target = event.target as HTMLElement | null;
+    const action = target?.dataset.action;
+    if (action !== undefined) {
+      handleHistoryItemMenuAction(action);
+    }
+  });
+  historyClearDialogCancel?.addEventListener('click', closeClearHistoryDialog);
+  historyClearDialogConfirm?.addEventListener('click', confirmClearHistory);
+  historyClearDialog?.addEventListener('click', (event) => {
+    if (event.target === historyClearDialog) {
+      closeClearHistoryDialog();
+    }
+  });
+  for (const radio of Array.from(historyClearRanges)) {
+    radio.addEventListener('change', () => {
+      if (radio.checked) {
+        historyClearSelection = radio.value as HistoryClearRange;
+      }
+    });
+  }
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      if (historyClearDialog?.hidden === false) {
+        closeClearHistoryDialog();
+      }
+      if (historyItemMenu?.hidden === false) {
+        closeHistoryItemMenu();
+      }
+    }
+  });
+}
+
 function attachPrivacyCenterHandlers(): void {
   privacyGlobalToggle?.addEventListener('click', () => {
     const panel = privacyState?.panel;
@@ -1874,6 +2285,7 @@ async function boot(): Promise<void> {
   attachShieldHandlers();
   attachPrivacyCenterHandlers();
   attachBookmarkHandlers();
+  attachHistoryHandlers();
 
   if (bridge === undefined) {
     const root = document.querySelector<HTMLElement>('#app');
@@ -1897,6 +2309,15 @@ async function boot(): Promise<void> {
   const bookmarkInitial = await bookmarksBridge?.getState();
   if (bookmarkInitial !== undefined) {
     applyBookmarkState(bookmarkInitial);
+  }
+
+  // History: a single subscription keeps the History Manager in sync. The
+  // main process pushes immediately for mutations and (throttled) after
+  // page visits.
+  historyBridge?.onStateChanged(applyHistoryState);
+  const historyInitial = await historyBridge?.getState();
+  if (historyInitial !== undefined) {
+    applyHistoryState(historyInitial);
   }
 }
 

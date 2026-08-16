@@ -162,6 +162,43 @@ export type {
   UpdateBookmarkResult,
 } from './bookmarks/bookmarkManager.js';
 
+export {
+  createHistoryId,
+  isValidHistoryUrl,
+  isValidHistoryFavicon,
+  historyKeyForUrl,
+  searchHistory,
+  localDayIndex,
+  historyDateGroupFor,
+  historyGroupLabel,
+  groupHistoryByDate,
+  hostnameFromHistoryUrl,
+  HISTORY_COLLECTION_VERSION,
+  MAX_HISTORY_TITLE_LENGTH,
+  MAX_HISTORY_FAVICON_LENGTH,
+} from './history/historyModel.js';
+export type {
+  HistoryEntry,
+  HistoryCollection,
+  HistoryDateGroup,
+  HistoryGroup,
+} from './history/historyModel.js';
+export {
+  parseHistoryCollection,
+  serializeHistoryCollection,
+  emptyHistoryCollection,
+} from './history/historyPersistence.js';
+export {
+  HistoryManager,
+  MAX_HISTORY_ENTRIES,
+  DUPLICATE_WINDOW_MS,
+} from './history/historyManager.js';
+export type {
+  RecordVisitInput,
+  RecordVisitOptions,
+  RecordVisitResult,
+} from './history/historyManager.js';
+
 export type {
   KeyValueStore,
   EncryptedStore,

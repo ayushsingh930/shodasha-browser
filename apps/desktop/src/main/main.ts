@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { Logger, TabManager } from '@shodasha/core';
 import { BookmarkCoordinator } from './bookmarkCoordinator.js';
 import { BrowserController } from './browserController.js';
+import { HistoryCoordinator } from './historyCoordinator.js';
 import { ShieldCoordinator } from './shieldCoordinator.js';
 import { ShieldSettingsStore } from './settingsStore.js';
 
@@ -23,6 +24,7 @@ let controller: BrowserController | null = null;
 let shield: ShieldCoordinator | null = null;
 let settingsStore: ShieldSettingsStore | null = null;
 let bookmarks: BookmarkCoordinator | null = null;
+let history: HistoryCoordinator | null = null;
 
 /**
  * Hardened WebPreferences for the chrome UI. Context isolation is on, node
@@ -62,6 +64,10 @@ function createMainWindow(): BrowserWindow {
   void win.loadFile(rendererHtml);
 
   const manager = new TabManager();
+  history ??= new HistoryCoordinator({
+    chrome: win.webContents,
+    file: path.join(app.getPath('userData'), 'history.json'),
+  });
   controller = new BrowserController({
     window: win,
     manager,
@@ -72,6 +78,7 @@ function createMainWindow(): BrowserWindow {
       bookmarks?.toggleToolbar();
     },
     bookmarksBarVisible: () => bookmarks?.isToolbarVisible() ?? false,
+    historyRecorder: history,
   });
   controller.init();
 
@@ -119,10 +126,11 @@ void app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
-  // Flush any debounced Shield settings and bookmark writes so saved data
-  // survives.
+  // Flush any debounced Shield settings, bookmark, and history writes so saved
+  // data survives.
   settingsStore?.flush();
   bookmarks?.dispose();
+  history?.dispose();
 });
 
 app.on('window-all-closed', () => {

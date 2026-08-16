@@ -99,6 +99,39 @@ security controls.
   collection instead of crashing; writes are atomic (tmp + rename) and
   debounced, and flushed on `before-quit`.
 
+## SHODASHA History Manager — security posture
+
+- **History entries are data, never code.** Opening an entry is a normal
+  navigation exactly like typing the URL; stored history is never executed,
+  rendered into privileged context, or injected into a page.
+- **Strict URL recording.** Only genuine `http:`/`https:` main-frame page
+  loads are recorded. SHODASHA internal pages and `about:` pages are never
+  recorded, and dangerous schemes are rejected before recording.
+- **All history IPC is validated in the main process.** Search terms, entry
+  ids, clear ranges, and site hostnames are type-checked and normalized in the
+  main process before they touch the recorder. Clear-range and per-site inputs
+  are validated against a fixed allowlist of ranges and the core `sameSite`
+  registrable-domain matcher — malformed input is rejected, never partially
+  applied. The renderer is never trusted.
+- **History is bounded and trimmable.** The recorder keeps a fixed 10k-entry
+  window and trims oldest-first, so the log cannot grow without bound; the
+  user can clear per-entry, by time range, or per-site at any time.
+- **History never leaves the device.** The visit log is stored locally in the
+  user-data directory as JSON. There is no sync, no telemetry, and no upload
+  of browsing history.
+- **The History Manager is unreachable from web content.** `shodasha://history`
+  is a chrome-rendered internal page like the Privacy Center and Bookmark
+  Manager. The privileged bridge (`window.shodasha`) exists only in the chrome
+  renderer; the sandboxed webview has no `window.shodasha`, `process`, or
+  `require`.
+- **Fail-safe persistence.** A corrupt history file degrades to an empty log
+  instead of crashing; writes are atomic (tmp + rename) and debounced, and
+  flushed on `before-quit`.
+- **Stale navigation events cannot corrupt state.** A per-tab navigation
+  sequence guards load events so a late event from an in-flight web load can
+  never overwrite a newer navigation (for example, an internal page opened
+  while a web page was still loading).
+
 ## Explicit non-goals (never do these)
 
 - Execute arbitrary remote code.

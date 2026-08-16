@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { Bookmark } from '@shodasha/core';
+import type { Bookmark, HistoryEntry } from '@shodasha/core';
 import {
   BOOKMARKS_URL,
+  HISTORY_URL,
   PRIVACY_CENTER_URL,
+  bookmarkForUrl,
+  groupHistoryByDate,
+  historyDateGroupFor,
   internalPageInfoFor,
   isBlankTabUrl,
   isInternalPageUrl,
   protectionStatusFor,
   searchBookmarks,
+  searchHistory,
   sortBookmarks,
   type ShieldPanelState,
 } from './browserState.js';
@@ -40,6 +45,12 @@ describe('isInternalPageUrl', () => {
     expect(isInternalPageUrl(` ${BOOKMARKS_URL} `)).toBe(true);
   });
 
+  it('recognizes the History Manager URL', () => {
+    expect(isInternalPageUrl(HISTORY_URL)).toBe(true);
+    expect(isInternalPageUrl('SHODASHA://HISTORY')).toBe(true);
+    expect(isInternalPageUrl(` ${HISTORY_URL} `)).toBe(true);
+  });
+
   it('rejects web URLs and other shodasha URLs', () => {
     expect(isInternalPageUrl('https://example.com')).toBe(false);
     expect(isInternalPageUrl('shodasha://other')).toBe(false);
@@ -66,14 +77,23 @@ describe('internalPageInfoFor', () => {
     });
   });
 
+  it('describes the History Manager', () => {
+    expect(internalPageInfoFor(HISTORY_URL)).toEqual({
+      url: 'shodasha://history',
+      kind: 'history',
+      title: 'History',
+    });
+  });
+
   it('is case- and whitespace-insensitive', () => {
     expect(internalPageInfoFor(' SHODASHA://BOOKMARKS ')?.kind).toBe('bookmarks');
+    expect(internalPageInfoFor(' SHODASHA://HISTORY ')?.kind).toBe('history');
   });
 
   it('returns null for non-internal URLs', () => {
     expect(internalPageInfoFor('https://example.com')).toBeNull();
     expect(internalPageInfoFor('')).toBeNull();
-    expect(internalPageInfoFor('shodasha://history')).toBeNull();
+    expect(internalPageInfoFor('shodasha://other')).toBeNull();
   });
 });
 
@@ -224,5 +244,111 @@ describe('sortBookmarks', () => {
     const snapshot = list.map((b) => b.title);
     sortBookmarks(list, 'name-asc');
     expect(list.map((b) => b.title)).toEqual(snapshot);
+  });
+});
+
+describe('searchHistory', () => {
+  function entry(id: string, url: string, title: string): HistoryEntry {
+    return { id, url, title, visitedAt: id.length, favicon: null };
+  }
+
+  const list = [
+    entry('a', 'https://github.com', 'GitHub'),
+    entry('b', 'https://docs.example.com', 'Docs'),
+    entry('c', 'https://example.com/search?q=shodasha', ''),
+  ];
+
+  it('returns every entry for an empty query', () => {
+    expect(searchHistory(list, '').length).toBe(3);
+    expect(searchHistory(list, '   ').length).toBe(3);
+  });
+
+  it('filters by title case-insensitively', () => {
+    expect(searchHistory(list, 'docs').map((e) => e.id)).toEqual(['b']);
+  });
+
+  it('filters by URL case-insensitively', () => {
+    expect(searchHistory(list, 'GITHUB.COM').map((e) => e.id)).toEqual(['a']);
+  });
+
+  it('matches a query parameter in a URL', () => {
+    expect(searchHistory(list, 'shodasha').map((e) => e.id)).toEqual(['c']);
+  });
+
+  it('does not mutate the input list', () => {
+    const snapshot = list.map((e) => e.id);
+    searchHistory(list, 'github');
+    expect(list.map((e) => e.id)).toEqual(snapshot);
+  });
+});
+
+describe('historyDateGroupFor', () => {
+  it('groups by local calendar day', () => {
+    const now = new Date('2026-01-15T10:00:00').getTime();
+    expect(historyDateGroupFor(new Date('2026-01-15T08:00:00').getTime(), now)).toBe('today');
+    expect(historyDateGroupFor(new Date('2026-01-14T23:00:00').getTime(), now)).toBe('yesterday');
+    expect(historyDateGroupFor(new Date('2026-01-13T00:00:00').getTime(), now)).toBe('earlier-week');
+    expect(historyDateGroupFor(new Date('2026-01-05T00:00:00').getTime(), now)).toBe('older');
+  });
+});
+
+describe('groupHistoryByDate', () => {
+  function entry(id: string, url: string, visitedAt: number): HistoryEntry {
+    return { id, url, title: '', visitedAt, favicon: null };
+  }
+
+  it('produces date groups in display order', () => {
+    const now = new Date('2026-01-15T10:00:00').getTime();
+    const groups = groupHistoryByDate(
+      [
+        entry('old', 'https://example.com/old', new Date('2026-01-05').getTime()),
+        entry('today', 'https://example.com/today', new Date('2026-01-15T08:00:00').getTime()),
+        entry('yesterday', 'https://example.com/y', new Date('2026-01-14').getTime()),
+      ],
+      now,
+    );
+    expect(groups.map((g) => g.key)).toEqual(['today', 'yesterday', 'older']);
+    expect(groups[0]?.entries.map((e) => e.id)).toEqual(['today']);
+    expect(groups[2]?.entries.map((e) => e.id)).toEqual(['old']);
+  });
+
+  it('returns an empty array for no entries', () => {
+    expect(groupHistoryByDate([], Date.now())).toEqual([]);
+  });
+});
+
+describe('bookmarkForUrl', () => {
+  function bookmark(id: string, url: string): Bookmark {
+    return {
+      id,
+      title: 'T',
+      url,
+      createdAt: 1,
+      updatedAt: 1,
+      folderId: null,
+      favicon: null,
+    };
+  }
+
+  const bookmarks = [
+    bookmark('a', 'https://example.com'),
+    bookmark('b', 'https://example.com/path'),
+    bookmark('c', 'https://evil-example.com'),
+  ];
+
+  it('matches the same resource regardless of trailing slash', () => {
+    expect(bookmarkForUrl(bookmarks, 'https://example.com')?.id).toBe('a');
+    expect(bookmarkForUrl(bookmarks, 'https://example.com/')?.id).toBe('a');
+    expect(bookmarkForUrl(bookmarks, 'https://example.com/path/')?.id).toBe('b');
+  });
+
+  it('does not confuse distinct hosts', () => {
+    expect(bookmarkForUrl(bookmarks, 'https://evil-example.com')?.id).toBe('c');
+    expect(bookmarkForUrl(bookmarks, 'https://example.com.evil.com')).toBeNull();
+  });
+
+  it('returns null when there is no match', () => {
+    expect(bookmarkForUrl(bookmarks, 'https://example.net')).toBeNull();
+    expect(bookmarkForUrl(bookmarks, '')).toBeNull();
   });
 });

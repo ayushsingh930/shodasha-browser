@@ -140,12 +140,42 @@ open bookmarks:
   display text; opening one is a normal navigation. Only `http:`/`https:` and
   SHODASHA internal pages may be bookmarked.
 
+## SHODASHA History Manager — local history
+
+The History Manager is a SHODASHA-internal page (`shodasha://history`)
+rendered by the chrome UI — never by the web content area — so external
+websites can never reach it. It shows the pages you have visited on this
+device:
+
+- **Automatic recording.** Genuine `http:`/`https:` page loads are recorded
+  locally with the page title, favicon, and visit time. Reloads within a 5
+  second window are folded into a single entry so the log stays clean, and
+  each page appears once with a visit count.
+- **Search and clear.** The manager searches titles and URLs locally (case
+  insensitive), deletes individual entries, clears a time range (last hour,
+  24 hours, 7 days, 30 days, all time), or clears everything for one site.
+- **Keyboard access.** Ctrl+H opens the History Manager; the same shortcut
+  while it is already open focuses it.
+
+### History data handling
+
+- **Persisted locally** (survive restarts): the visit log, as a JSON file in
+  Electron's user-data directory. Writes are atomic and fail-safe; a corrupt
+  file degrades to an empty log. The log is bounded at 10,000 entries,
+  trimming oldest-first.
+- **Never sent anywhere.** History is stored on this device. There is no sync,
+  no remote service, and no telemetry. Local search runs entirely on this
+  device.
+- **What is never recorded.** SHODASHA internal pages (`shodasha://history`,
+  `shodasha://bookmarks`, `shodasha://privacy`, `shodasha://ntp`) and
+  `about:` pages are never recorded, and dangerous schemes are rejected before
+  recording.
+
 ## Planned privacy features (roadmap, not yet implemented)
 
 - Filter-list manager UI with updates (lists are local and static in this
   build; `updatesEnabled` is always false).
 - Encrypted, at-rest storage for local data.
-- Clear-browsing-data controls.
 - A Privacy Policy document aligned with these principles.
 
 ## Data handling

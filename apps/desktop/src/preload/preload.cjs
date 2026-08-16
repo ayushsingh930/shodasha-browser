@@ -54,6 +54,13 @@ const IPC = {
   bookmarkSearch: 'bookmarks:search',
   bookmarkSetToolbarVisible: 'bookmarks:set-toolbar-visible',
   bookmarkOpenAddDialog: 'bookmarks:open-add-dialog',
+  historyGetState: 'history:get-state',
+  historyStateChanged: 'history:state-changed',
+  historySearch: 'history:search',
+  historyDeleteEntry: 'history:delete-entry',
+  historyClear: 'history:clear',
+  historyClearRange: 'history:clear-range',
+  historyClearSite: 'history:clear-site',
 };
 
 function subscribe(channel, callback) {
@@ -126,5 +133,15 @@ contextBridge.exposeInMainWorld('shodasha', {
     onStateChanged: (callback) => subscribe(IPC.bookmarkStateChanged, callback),
     onOpenAddDialog: (callback) =>
       subscribe(IPC.bookmarkOpenAddDialog, callback),
+  },
+  history: {
+    getState: () => ipcRenderer.invoke(IPC.historyGetState),
+    search: (query) => ipcRenderer.invoke(IPC.historySearch, query),
+    deleteEntry: (id) => ipcRenderer.invoke(IPC.historyDeleteEntry, id),
+    clear: () => ipcRenderer.invoke(IPC.historyClear),
+    clearRange: (start, end) =>
+      ipcRenderer.invoke(IPC.historyClearRange, { start, end }),
+    clearSite: (site) => ipcRenderer.invoke(IPC.historyClearSite, site),
+    onStateChanged: (callback) => subscribe(IPC.historyStateChanged, callback),
   },
 });
