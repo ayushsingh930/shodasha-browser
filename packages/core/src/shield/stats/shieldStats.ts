@@ -32,6 +32,10 @@ export interface SiteStats {
   readonly requestsBlocked: number;
   /** Requests allowed while this site was the current site. */
   readonly requestsAllowed: number;
+  /** Blocked requests on this site whose matched rule was a tracker/social tracker. */
+  readonly trackersBlocked: number;
+  /** Blocked requests on this site whose matched rule was an ad. */
+  readonly adsFiltered: number;
 }
 
 /** Returns a zeroed stats snapshot. */
@@ -98,14 +102,24 @@ export class ShieldStatsCounter {
   public recordBlock(matchedRules: readonly FilterRule[], site?: string | null): void {
     this.stats.requestsBlocked += 1;
     const categories = new Set(matchedRules.map((rule) => rule.category));
-    if (categories.has('trackers') || categories.has('social-tracking')) {
+    const isTracker =
+      categories.has('trackers') || categories.has('social-tracking');
+    const isAd = categories.has('ads');
+    if (isTracker) {
       this.stats.trackersBlocked += 1;
     }
-    if (categories.has('ads')) {
+    if (isAd) {
       this.stats.adsFiltered += 1;
     }
     if (site !== undefined && site !== null && site.length > 0) {
-      this.touchSite(site).requestsBlocked += 1;
+      const siteEntry = this.touchSite(site);
+      siteEntry.requestsBlocked += 1;
+      if (isTracker) {
+        siteEntry.trackersBlocked += 1;
+      }
+      if (isAd) {
+        siteEntry.adsFiltered += 1;
+      }
     }
   }
 
@@ -141,14 +155,28 @@ interface MutableSiteStats {
   requestsEvaluated: number;
   requestsBlocked: number;
   requestsAllowed: number;
+  trackersBlocked: number;
+  adsFiltered: number;
 }
 
 function emptySiteStats(): SiteStats {
-  return { requestsEvaluated: 0, requestsBlocked: 0, requestsAllowed: 0 };
+  return {
+    requestsEvaluated: 0,
+    requestsBlocked: 0,
+    requestsAllowed: 0,
+    trackersBlocked: 0,
+    adsFiltered: 0,
+  };
 }
 
 function emptyMutableSiteStats(): MutableSiteStats {
-  return { requestsEvaluated: 0, requestsBlocked: 0, requestsAllowed: 0 };
+  return {
+    requestsEvaluated: 0,
+    requestsBlocked: 0,
+    requestsAllowed: 0,
+    trackersBlocked: 0,
+    adsFiltered: 0,
+  };
 }
 
 function emptyMutableStats(): MutableShieldStats {

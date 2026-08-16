@@ -38,10 +38,22 @@ export {
 export {
   InMemoryFilterListSource,
   type FilterListSource,
+  type FilterListStatus,
 } from './lists/filterListSource.js';
 export { parseRuleLines } from './lists/parseBlocklist.js';
 export type { ParseBlocklistOptions } from './lists/parseBlocklist.js';
 export { demoFilterList, DEMO_FILTER_RULES } from './lists/demoFilterList.js';
+
+export {
+  emptyShieldSettings,
+  isShieldMode,
+  parseShieldSettings,
+  serializeShieldSettings,
+  collectShieldSettings,
+  applyShieldSettings,
+  type ShieldSettings,
+  type PersistedSiteSetting,
+} from './persistence/shieldSettings.js';
 
 export type {
   ShieldRequest,

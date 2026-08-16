@@ -7,6 +7,7 @@
  */
 
 import type {
+  FilterListStatus,
   SecurityState,
   ShieldFilterEvent,
   ShieldMode,
@@ -70,6 +71,90 @@ export function isBlankTabUrl(url: string): boolean {
   return url.length === 0 || url === 'about:blank' || url.startsWith('about:blank#');
 }
 
+/** The internal URL of the SHODASHA Privacy Center. */
+export const PRIVACY_CENTER_URL = 'shodasha://privacy';
+
+/**
+ * Whether a URL is a SHODASHA internal page rendered by the browser chrome
+ * (never by web content). Internal pages are safe, trusted pages such as the
+ * Privacy Center; they cannot be loaded from an external website.
+ */
+export function isInternalPageUrl(url: string): boolean {
+  return url.trim().toLowerCase() === PRIVACY_CENTER_URL;
+}
+
+/**
+ * An honest, deterministic protection status derived from the current Shield
+ * state. SHODASHA never claims absolute privacy: these statuses describe what
+ * is active right now, not a guarantee.
+ */
+export type ProtectionStatus = 'protected' | 'limited' | 'off';
+
+/** The user-facing rendering of a {@link ProtectionStatus}. */
+export interface ProtectionStatusView {
+  readonly status: ProtectionStatus;
+  readonly label: string;
+  readonly note: string;
+}
+
+/**
+ * Computes the protection status shown in the Privacy Center. `limited` means
+ * the Shield is on globally but off for the current site. `off` means the
+ * Shield is paused entirely.
+ */
+export function protectionStatusFor(
+  panel: ShieldPanelState,
+): ProtectionStatusView {
+  if (!panel.enabled) {
+    return {
+      status: 'off',
+      label: 'Shield is off',
+      note: 'Filtering is paused. Turn the Shield on to resume protection.',
+    };
+  }
+  if (panel.currentSite === null) {
+    return {
+      status: 'protected',
+      label: 'Protected',
+      note: 'Protection is on. No site is being viewed right now.',
+    };
+  }
+  if (!panel.siteEnabled) {
+    return {
+      status: 'limited',
+      label: 'Limited',
+      note: 'The Shield is turned off for this site.',
+    };
+  }
+  return {
+    status: 'protected',
+    label: 'Protected',
+    note: 'Protection is active for this site. SHODASHA filters requests it has rules for; it does not block every tracker or ad.',
+  };
+}
+
+/** The full state shown by the SHODASHA Privacy Center. */
+export interface PrivacyCenterState {
+  /** The same Shield panel data the popup uses. */
+  readonly panel: ShieldPanelState;
+  /** The currently allowlisted domains. */
+  readonly allowlist: readonly string[];
+  /** The status of every filter list loaded into the Shield. */
+  readonly filterLists: readonly FilterListStatus[];
+  /** The total number of rules active across all lists. */
+  readonly totalRulesLoaded: number;
+  /** Honest protection status (never an absolute privacy claim). */
+  readonly protectionStatus: ProtectionStatus;
+  readonly protectionLabel: string;
+  readonly protectionNote: string;
+  /** Whether filtering happens entirely on this device (always true). */
+  readonly localProcessing: boolean;
+  /** Whether telemetry is enabled (always false). */
+  readonly telemetryEnabled: boolean;
+  /** Whether browsing analytics are collected (always false). */
+  readonly browsingAnalyticsEnabled: boolean;
+}
+
 /** IPC channel names used between renderer and main. */
 export const IPC = {
   getState: 'browser:get-state',
@@ -99,4 +184,9 @@ export const IPC = {
   shieldSubscribe: 'shield:subscribe',
   shieldUnsubscribe: 'shield:unsubscribe',
   shieldPanelChanged: 'shield:panel-changed',
+  privacyGetState: 'privacy:get-state',
+  shieldResetStats: 'shield:reset-stats',
+  shieldGetAllowlist: 'shield:get-allowlist',
+  shieldAddAllowlist: 'shield:add-allowlist',
+  shieldRemoveAllowlist: 'shield:remove-allowlist',
 } as const;

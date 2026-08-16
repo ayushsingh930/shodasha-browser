@@ -89,6 +89,12 @@ export {
   demoFilterList,
   DEMO_FILTER_RULES,
   RecentEventsBuffer,
+  emptyShieldSettings,
+  isShieldMode,
+  parseShieldSettings,
+  serializeShieldSettings,
+  collectShieldSettings,
+  applyShieldSettings,
 } from './shield/index.js';
 export type {
   ShieldRequest,
@@ -108,6 +114,9 @@ export type {
   ShieldStats,
   SiteStats,
   FilterListSource,
+  FilterListStatus,
+  ShieldSettings,
+  PersistedSiteSetting,
   ParseBlocklistOptions,
   ShieldFilterEvent,
 } from './shield/index.js';

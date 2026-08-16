@@ -33,7 +33,10 @@ import {
 } from './engine/hostname.js';
 import { classifyParty } from './engine/party.js';
 import { RuleEngine } from './engine/ruleMatcher.js';
-import type { FilterListSource } from './lists/filterListSource.js';
+import type {
+  FilterListSource,
+  FilterListStatus,
+} from './lists/filterListSource.js';
 import {
   RecentEventsBuffer,
   type ShieldFilterEvent,
@@ -90,6 +93,10 @@ export class ShieldEngine {
   private readonly siteSettings = new Map<string, SiteShieldSetting>();
   private readonly allowlistSet = new Set<string>();
   private readonly decisionCache = new Map<string, ShieldDecision>();
+  private readonly loadedLists = new Map<
+    string,
+    { readonly source: FilterListSource; readonly accepted: number }
+  >();
   private enabledState = true;
   private modeState: ShieldMode = 'standard';
   private readonly customCategorySet = new Set<ShieldCategory>(CORE_CATEGORIES);
@@ -176,6 +183,22 @@ export class ShieldEngine {
     }
   }
 
+  /**
+   * A snapshot of the explicit per-site settings. Used by hosts to persist
+   * preferences (never any browsing activity).
+   */
+  public siteSettingsSnapshot(): readonly {
+    site: string;
+    enabled: boolean;
+    mode: ShieldMode;
+  }[] {
+    return [...this.siteSettings.entries()].map(([site, setting]) => ({
+      site,
+      enabled: setting.enabled,
+      mode: setting.mode,
+    }));
+  }
+
   // ------------------------------------------------------- allowlist
 
   /** Adds a domain to the allowlist. Returns `false` when invalid. */
@@ -244,12 +267,33 @@ export class ShieldEngine {
 
   /** Loads all rules from a filter-list source. Returns the count accepted. */
   public addList(source: FilterListSource): number {
-    return this.addRules(source.loadRules());
+    const accepted = this.addRules(source.loadRules());
+    this.loadedLists.set(source.id, { source, accepted });
+    return accepted;
   }
 
   /** The number of compiled rules. */
   public get ruleCount(): number {
     return this.ruleEngine.ruleCount;
+  }
+
+  /**
+   * The status of every list loaded into the Shield, for the filter-list
+   * management UI. All loaded lists are active; `updatesEnabled` is always
+   * false because lists are local and never downloaded automatically.
+   */
+  public listStatus(): readonly FilterListStatus[] {
+    return [...this.loadedLists.values()].map(({ source, accepted }) => ({
+      id: source.id,
+      name: source.name,
+      active: true,
+      rulesLoaded: accepted,
+      version: source.version,
+      license: source.license,
+      updatedAt: source.updatedAt,
+      provenance: source.provenance,
+      updatesEnabled: false,
+    }));
   }
 
   // ------------------------------------------------------- statistics

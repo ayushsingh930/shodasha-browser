@@ -74,10 +74,14 @@ wire the contracts into their platform.
   Electron's request pipeline (`webRequest.onBeforeRequest`): builds a
   `ShieldRequest` per filterable request, evaluates it against the active
   site's settings, cancels only blocked requests, and pushes throttled panel
-  state to the renderer while subscribed. Loads the bundled demo test list at
-  startup.
+  state to the renderer while subscribed (ref-counted across the popup and the
+  Privacy Center). Loads the bundled demo test list at startup, serializes the
+  Privacy Center state, and persists settings through the settings store.
+- **`apps/desktop/src/main/settingsStore`** — debounced, atomic, fail-safe
+  JSON persistence for Shield settings (settings only; never statistics).
 - **`apps/desktop/src/preload`** — isolated preload bridge.
-- **`apps/desktop/src/renderer`** — sandboxed UI.
+- **`apps/desktop/src/renderer`** — sandboxed UI (toolbar, tabs, NTP, Shield
+  popup, site-settings panel, and the chrome-rendered Privacy Center).
 
 ## SHODASHA Shield — request filtering
 
@@ -160,17 +164,42 @@ Decisions are cached in a bounded cache (4 096 entries) keyed by hostname,
 party, resource type, current site, and a context version; the cache is
 invalidated on every rule, mode, allowlist, or per-site change, so stale or
 bypassable decisions are impossible. Panel pushes to the renderer are
-throttled (500 ms) and only occur while the panel is subscribed.
+throttled (500 ms) and only occur while a UI (the popup or the Privacy
+Center) is subscribed; subscribers are ref-counted.
 
 ### Statistics and events
 
 Aggregate counters (`requestsEvaluated`, `requestsBlocked`, `requestsAllowed`,
 `trackersBlocked`, `adsFiltered`) are session-scoped and count each request
-once. Per-site aggregate counters for the current site are kept in memory
-only (bounded). Recent filter events are mirrored into a small in-memory
-buffer (50 entries) holding only `category`, `resource type`, `hostname`, and
-`action` — never full URLs, query strings, or payloads, and nothing is
-persisted.
+once. Per-site aggregate counters for the current site (including its own
+tracker/ad breakdown) are kept in memory only (bounded). Recent filter events
+are mirrored into a small in-memory buffer (50 entries) holding only
+`category`, `resource type`, `hostname`, and `action` — never full URLs, query
+strings, or payloads, and nothing is persisted.
+
+## SHODASHA Privacy Center
+
+The Privacy Center is a chrome-rendered internal page at `shodasha://privacy`
+(no custom scheme registration — it is a model-level URL). It shares the
+**single source of truth**: the `ShieldCoordinator` serializes the engine's
+real state (`serializePrivacyState()`) — panel state, allowlist, filter-list
+status, total rules loaded, and an honest `protectionStatusFor()` derivation
+(PROTECTED / LIMITED / OFF). The renderer re-fetches this state on each
+throttled panel push while the page is visible, so the dashboard always shows
+real counters and never fabricated numbers.
+
+### Persistence boundary
+
+Settings survive restarts via `ShieldSettingsStore`
+(`apps/desktop/src/main/settingsStore.ts`): a JSON file in Electron's
+user-data directory, loaded fail-safely and saved debounced (300 ms) with an
+atomic tmp+rename write, flushed on `before-quit`. The host-agnostic
+serialization lives in the core as pure functions
+(`packages/core/src/shield/persistence/shieldSettings.ts`). Only settings are
+persisted — statistics, events, and browsing activity are session-only and
+never touch disk. Loaded filter lists report their status through the core
+engine's `listStatus()` (name, rules, version, license, updatedAt, provenance,
+`updatesEnabled: false`).
 
 ## Content filtering seam
 

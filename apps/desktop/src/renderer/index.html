@@ -129,8 +129,12 @@
                 <dd id="shield-stat-ads">0</dd>
               </div>
             </dl>
+            <div class="shield-setting-row">
+              <span class="shield-setting-label">This site</span>
+              <span id="shield-current-site" class="shield-setting-value">&mdash;</span>
+            </div>
             <div class="shield-site-line">
-              <span>This site</span>
+              <span>Session on this site</span>
               <span id="shield-site-stats" class="shield-setting-value">&mdash;</span>
             </div>
             <div class="shield-recent" id="shield-recent" hidden>
@@ -145,12 +149,15 @@
                 <option value="custom">Custom</option>
               </select>
             </div>
-            <div class="shield-actions">
+            <div class="shield-actions shield-actions-col">
               <button type="button" id="shield-toggle" class="shield-action-btn" aria-pressed="true">
                 Shield ON
               </button>
               <button type="button" id="shield-site-settings" class="shield-action-btn">
                 Site Settings
+              </button>
+              <button type="button" id="shield-privacy-center" class="shield-action-btn">
+                Privacy Center
               </button>
             </div>
           </section>
@@ -169,7 +176,7 @@
               </button>
             </header>
             <div class="site-setting-row">
-              <span class="shield-setting-label">Current Site</span>
+              <span class="shield-setting-label">Website</span>
               <span id="site-settings-current" class="shield-setting-value">&mdash;</span>
             </div>
             <div class="site-setting-row">
@@ -188,12 +195,39 @@
               <span class="shield-setting-label">Allowlist</span>
               <button type="button" id="site-settings-allowlist" class="shield-toggle-btn" aria-pressed="false">OFF</button>
             </div>
+            <dl class="shield-stats site-settings-stats">
+              <div class="shield-stat">
+                <dt>Requests evaluated</dt>
+                <dd id="site-settings-stat-evaluated">0</dd>
+              </div>
+              <div class="shield-stat">
+                <dt>Requests filtered</dt>
+                <dd id="site-settings-stat-filtered">0</dd>
+              </div>
+              <div class="shield-stat">
+                <dt>Trackers blocked</dt>
+                <dd id="site-settings-stat-trackers">0</dd>
+              </div>
+              <div class="shield-stat">
+                <dt>Ads filtered</dt>
+                <dd id="site-settings-stat-ads">0</dd>
+              </div>
+            </dl>
+            <div class="shield-actions shield-actions-col">
+              <button type="button" id="site-settings-shield-action" class="shield-action-btn">
+                Turn Shield Off
+              </button>
+              <button type="button" id="site-settings-allowlist-action" class="shield-action-btn">
+                Add to Allowlist
+              </button>
+            </div>
           </section>
 
           <nav id="menu" class="menu" hidden>
             <button type="button" data-action="new-tab">New tab</button>
             <button type="button" data-action="close-tab">Close tab</button>
             <button type="button" data-action="reload">Reload</button>
+            <button type="button" data-action="privacy-center">Privacy Center</button>
             <button type="button" data-action="reopen-closed">Reopen closed tab</button>
           </nav>
         </div>
@@ -202,6 +236,183 @@
       <nav id="tab-bar" class="tab-bar" aria-label="Tabs"></nav>
 
       <main id="content-frame" class="content-frame"></main>
+
+      <section id="privacy-center" class="privacy-center" hidden aria-label="SHODASHA Privacy Center">
+        <div class="privacy-center-inner">
+          <header class="privacy-header">
+            <div>
+              <h1 class="privacy-title">SHODASHA Privacy Center</h1>
+              <p class="privacy-subtitle">Understand and control how SHODASHA protects your browsing.</p>
+            </div>
+            <div class="privacy-status">
+              <span class="privacy-status-badge" id="privacy-status-badge" data-status="protected">Protected</span>
+              <p class="privacy-status-note" id="privacy-status-note"></p>
+            </div>
+          </header>
+
+          <p class="privacy-error" id="privacy-error" hidden>
+            Privacy information is temporarily unavailable. Please try again.
+          </p>
+
+          <div class="privacy-grid">
+            <section class="privacy-card" aria-labelledby="privacy-head-overview">
+              <h2 id="privacy-head-overview">Protection Overview</h2>
+              <dl class="privacy-rows">
+                <div class="privacy-row">
+                  <dt>Shield</dt>
+                  <dd id="privacy-overview-shield" class="privacy-value">ON</dd>
+                </div>
+                <div class="privacy-row">
+                  <dt>Filtering</dt>
+                  <dd id="privacy-overview-filtering" class="privacy-value">ACTIVE</dd>
+                </div>
+                <div class="privacy-row">
+                  <dt>Protection Mode</dt>
+                  <dd id="privacy-overview-mode" class="privacy-value">Standard</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section class="privacy-card" aria-labelledby="privacy-head-stats">
+              <h2 id="privacy-head-stats">Session Statistics</h2>
+              <dl class="privacy-grid-2">
+                <div class="privacy-stat">
+                  <dt>Requests evaluated</dt>
+                  <dd id="privacy-stat-evaluated">0</dd>
+                </div>
+                <div class="privacy-stat">
+                  <dt>Requests allowed</dt>
+                  <dd id="privacy-stat-allowed">0</dd>
+                </div>
+                <div class="privacy-stat">
+                  <dt>Requests filtered</dt>
+                  <dd id="privacy-stat-blocked">0</dd>
+                </div>
+                <div class="privacy-stat">
+                  <dt>Ads filtered</dt>
+                  <dd id="privacy-stat-ads">0</dd>
+                </div>
+                <div class="privacy-stat">
+                  <dt>Trackers blocked</dt>
+                  <dd id="privacy-stat-trackers">0</dd>
+                </div>
+              </dl>
+              <div class="privacy-row">
+                <dt>This site</dt>
+                <dd id="privacy-site-line" class="privacy-value">&mdash;</dd>
+              </div>
+            </section>
+
+            <section class="privacy-card" aria-labelledby="privacy-head-controls">
+              <h2 id="privacy-head-controls">Protection Controls</h2>
+              <div class="privacy-control">
+                <span class="privacy-label">Global Shield</span>
+                <button type="button" id="privacy-global-toggle" class="privacy-btn" aria-pressed="true">
+                  Shield ON
+                </button>
+              </div>
+              <div class="privacy-control">
+                <span class="privacy-label">Protection Mode</span>
+                <select id="privacy-mode" class="shield-select">
+                  <option value="standard">Standard</option>
+                  <option value="strict">Strict</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div class="privacy-control">
+                <span class="privacy-label">Statistics</span>
+                <button type="button" id="privacy-reset-stats" class="privacy-btn">
+                  Reset Statistics
+                </button>
+              </div>
+              <p class="privacy-note">
+                Statistics are session-only and never leave this device.
+              </p>
+            </section>
+
+            <section class="privacy-card" aria-labelledby="privacy-head-site">
+              <h2 id="privacy-head-site">Site Protection</h2>
+              <dl class="privacy-rows">
+                <div class="privacy-row">
+                  <dt>Current Site</dt>
+                  <dd id="privacy-site" class="privacy-value">&mdash;</dd>
+                </div>
+                <div class="privacy-row">
+                  <dt>Protection</dt>
+                  <dd id="privacy-site-protection" class="privacy-value">&mdash;</dd>
+                </div>
+              </dl>
+              <div class="privacy-control">
+                <span class="privacy-label">This site</span>
+                <button type="button" id="privacy-site-toggle" class="privacy-btn" aria-pressed="true">
+                  Site Shield ON
+                </button>
+              </div>
+            </section>
+
+            <section class="privacy-card" aria-labelledby="privacy-head-lists">
+              <h2 id="privacy-head-lists">Filter Lists</h2>
+              <div class="privacy-rows">
+                <div class="privacy-row">
+                  <dt>Rules loaded</dt>
+                  <dd id="privacy-lists-rules" class="privacy-value">0</dd>
+                </div>
+                <div class="privacy-row">
+                  <dt>Updates</dt>
+                  <dd id="privacy-lists-updates" class="privacy-value">Local lists (no auto-download)</dd>
+                </div>
+              </div>
+              <ul id="privacy-lists" class="privacy-lists"></ul>
+            </section>
+
+            <section class="privacy-card" aria-labelledby="privacy-head-allowlist">
+              <h2 id="privacy-head-allowlist">Allowlist</h2>
+              <p class="privacy-note">Allowlisted sites are never filtered by rules.</p>
+              <form id="privacy-allowlist-add" class="privacy-add-form">
+                <input
+                  id="privacy-allowlist-input"
+                  type="text"
+                  placeholder="example.com"
+                  aria-label="Website to allowlist"
+                  spellcheck="false"
+                  autocomplete="off"
+                />
+                <button type="submit" class="privacy-btn">Add Website</button>
+              </form>
+              <p class="privacy-feedback" id="privacy-allowlist-feedback" role="status"></p>
+              <ul id="privacy-allowlist-list" class="privacy-lists"></ul>
+            </section>
+
+            <section class="privacy-card" aria-labelledby="privacy-head-recent">
+              <h2 id="privacy-head-recent">Recent Protection Activity</h2>
+              <ul id="privacy-recent-list" class="privacy-recent-list"></ul>
+            </section>
+
+            <section class="privacy-card" aria-labelledby="privacy-head-privacy">
+              <h2 id="privacy-head-privacy">Privacy</h2>
+              <dl class="privacy-rows">
+                <div class="privacy-row">
+                  <dt>Local processing</dt>
+                  <dd class="privacy-value">Enabled</dd>
+                </div>
+                <div class="privacy-row">
+                  <dt>Telemetry</dt>
+                  <dd class="privacy-value">Disabled</dd>
+                </div>
+                <div class="privacy-row">
+                  <dt>Browsing analytics</dt>
+                  <dd class="privacy-value">Disabled</dd>
+                </div>
+              </dl>
+              <p class="privacy-note">
+                All Shield filtering happens on this device. No browsing data is
+                collected or sent anywhere, and privacy cannot be guaranteed
+                absolutely.
+              </p>
+            </section>
+          </div>
+        </div>
+      </section>
 
       <section id="new-tab-page" class="new-tab-page" hidden>
         <div class="ntp-mark" aria-hidden="true">S</div>

@@ -24,6 +24,8 @@ import type { NavigationError } from '@shodasha/core';
 import {
   IPC,
   isBlankTabUrl,
+  isInternalPageUrl,
+  PRIVACY_CENTER_URL,
   type BrowserState,
   type TabViewState,
 } from '../shared/browserState.js';
@@ -175,6 +177,12 @@ export class BrowserController {
   private handleSubmitAddress(input: string): void {
     const active = this.manager.activeTab;
     if (active === null) {
+      return;
+    }
+    const trimmed = input.trim();
+    if (isInternalPageUrl(trimmed)) {
+      // SHODASHA internal pages are never web URLs; route them directly.
+      this.navigateInternal(active.id, PRIVACY_CENTER_URL);
       return;
     }
     const interpretation = classifyAddressInput(input);
@@ -555,6 +563,11 @@ export class BrowserController {
     if (live.wc.isDestroyed()) {
       return;
     }
+    if (isInternalPageUrl(url)) {
+      // Internal pages are rendered by the chrome UI, never by the webview.
+      this.navigateInternal(live.id, PRIVACY_CENTER_URL, recordHistory);
+      return;
+    }
     if (!isAllowedNavigationUrl(url)) {
       this.showErrorPage(
         live,
@@ -575,6 +588,27 @@ export class BrowserController {
       // did-fail-load will surface the user-facing error; swallow here.
     });
     this.relayout();
+  }
+
+  /**
+   * Navigates a tab to a SHODASHA internal page. The page is rendered by the
+   * chrome UI (like the new-tab page), so nothing is loaded into the webview;
+   * the tab model records the internal URL and its security state.
+   */
+  private navigateInternal(tabId: string, url: string, recordHistory = true): void {
+    if (this.manager.getTab(tabId) === null) {
+      return;
+    }
+    if (recordHistory) {
+      this.manager.beginNavigation(tabId, url);
+    } else {
+      this.manager.setUrl(tabId, url);
+      this.manager.setLoading(tabId, false);
+    }
+    this.manager.setTitle(tabId, 'Privacy Center');
+    this.manager.setSecurityState(tabId, 'internal');
+    this.relayout();
+    this.pushState();
   }
 
   private showErrorPage(
@@ -635,10 +669,12 @@ export class BrowserController {
         live.view.setVisible(false);
         continue;
       }
-      // A blank tab renders the SHODASHA new-tab page in the chrome, so its
-      // view stays hidden until a real page is loaded.
+      // A blank tab renders the SHODASHA new-tab page in the chrome, and an
+      // internal page (e.g. the Privacy Center) is also chrome-rendered, so
+      // both keep their webview hidden.
       const isBlank = tab.active && isBlankTabUrl(tab.url) && !tab.showErrorPage;
-      if (tab.active && !isBlank) {
+      const isInternal = tab.active && isInternalPageUrl(tab.url);
+      if (tab.active && !isBlank && !isInternal) {
         live.view.setBounds({ x: 0, y: CHROME_HEIGHT, width, height: height - CHROME_HEIGHT });
         live.view.setVisible(true);
       } else {
@@ -710,6 +746,9 @@ export class BrowserController {
 /** Whether a URL may be loaded by SHODASHA. */
 function isAllowedNavigationUrl(url: string): boolean {
   if (url === 'about:blank' || url.startsWith('about:blank')) {
+    return true;
+  }
+  if (isInternalPageUrl(url)) {
     return true;
   }
   try {

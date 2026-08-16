@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { Logger, TabManager } from '@shodasha/core';
 import { BrowserController } from './browserController.js';
 import { ShieldCoordinator } from './shieldCoordinator.js';
+import { ShieldSettingsStore } from './settingsStore.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,6 +20,7 @@ const logger = new Logger({ level: 'info' });
 
 let controller: BrowserController | null = null;
 let shield: ShieldCoordinator | null = null;
+let settingsStore: ShieldSettingsStore | null = null;
 
 /**
  * Hardened WebPreferences for the chrome UI. Context isolation is on, node
@@ -61,9 +63,13 @@ function createMainWindow(): BrowserWindow {
   controller = new BrowserController({ window: win, manager });
   controller.init();
 
+  settingsStore ??= new ShieldSettingsStore(
+    path.join(app.getPath('userData'), 'shield-settings.json'),
+  );
   shield ??= new ShieldCoordinator({
     session: win.webContents.session,
     chrome: win.webContents,
+    settingsStore,
   });
   shield.attachManager(manager);
 
@@ -88,6 +94,11 @@ void app.whenReady().then(() => {
       createMainWindow();
     }
   });
+});
+
+app.on('before-quit', () => {
+  // Flush any debounced Shield settings write so saved preferences survive.
+  settingsStore?.flush();
 });
 
 app.on('window-all-closed', () => {

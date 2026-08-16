@@ -37,6 +37,11 @@ const IPC = {
   shieldSubscribe: 'shield:subscribe',
   shieldUnsubscribe: 'shield:unsubscribe',
   shieldPanelChanged: 'shield:panel-changed',
+  privacyGetState: 'privacy:get-state',
+  shieldResetStats: 'shield:reset-stats',
+  shieldGetAllowlist: 'shield:get-allowlist',
+  shieldAddAllowlist: 'shield:add-allowlist',
+  shieldRemoveAllowlist: 'shield:remove-allowlist',
 };
 
 function subscribe(channel, callback) {
@@ -84,5 +89,13 @@ contextBridge.exposeInMainWorld('shodasha', {
     subscribe: () => ipcRenderer.send(IPC.shieldSubscribe),
     unsubscribe: () => ipcRenderer.send(IPC.shieldUnsubscribe),
     onPanelChanged: (callback) => subscribe(IPC.shieldPanelChanged, callback),
+  },
+  privacy: {
+    getState: () => ipcRenderer.invoke(IPC.privacyGetState),
+    resetStatistics: () => ipcRenderer.invoke(IPC.shieldResetStats),
+    getAllowlist: () => ipcRenderer.invoke(IPC.shieldGetAllowlist),
+    addToAllowlist: (site) => ipcRenderer.invoke(IPC.shieldAddAllowlist, site),
+    removeFromAllowlist: (site) =>
+      ipcRenderer.invoke(IPC.shieldRemoveAllowlist, site),
   },
 });

@@ -15,6 +15,10 @@ working request filter (SHODASHA Shield) wired into the desktop browser.
 - ✅ Project foundation (workspace, core library, desktop shell, tooling, tests)
 - ✅ SHODASHA Shield — rule-based ad/tracker request filtering (modes,
       per-site control, allowlist, statistics, recent activity)
+- ✅ SHODASHA Privacy Center — `shodasha://privacy` dashboard: protection
+      status, session/site statistics, protection controls, filter-list
+      status, allowlist manager, recent activity; settings persist across
+      restarts (statistics are session-only)
 - ⏳ Tab management
 - ⏳ Password manager
 - ⏳ Android / Play Store packaging
@@ -22,8 +26,10 @@ working request filter (SHODASHA Shield) wired into the desktop browser.
 The Shield filters requests at the network layer via deterministic rules and
 never claims to block every ad or tracker — it only blocks what a validated
 rule matches. The bundled demo list covers reserved `.test` domains to prove
-the pipeline; real lists must be imported with their license metadata. See
-[PRIVACY.md](./PRIVACY.md) for the full behavior.
+the pipeline; real lists must be imported with their license metadata. The
+Privacy Center reports honest protection status (PROTECTED / LIMITED / OFF)
+and real engine counters; it never fabricates statistics or claims absolute
+privacy. See [PRIVACY.md](./PRIVACY.md) for the full behavior.
 
 See [DEVELOPMENT.md](./DEVELOPMENT.md) for the roadmap and
 [ARCHITECTURE.md](./ARCHITECTURE.md) for the design.

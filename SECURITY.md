@@ -57,6 +57,17 @@ security controls.
 - **Filter lists are explicit.** Every list must declare `license`,
   `updatedAt`, and `provenance`; nothing is bundled silently. The bundled
   list is a demo test list using reserved `.test` domains only.
+- **The Privacy Center is unreachable from web content.** `shodasha://privacy`
+  is a chrome-rendered internal page. It is not a registered scheme and the
+  privileged bridge (`window.shodasha`) exists only in the chrome renderer;
+  the sandboxed webview has no `window.shodasha`, `process`, or `require`.
+- **All IPC inputs are validated in the main process.** Per-site settings and
+  allowlist entries are normalized through hostname validation before they
+  touch the engine; malformed input is rejected, never partially applied.
+- **Settings persistence is scoped and fail-safe.** Only Shield settings
+  (global on/off, mode, per-site, allowlist) are written to disk, in a
+  debounced, atomic write. Statistics, events, and browsing activity are never
+  persisted. A corrupt settings file degrades to defaults instead of crashing.
 
 ## Explicit non-goals (never do these)
 

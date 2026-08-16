@@ -63,3 +63,32 @@ export class InMemoryFilterListSource implements FilterListSource {
     return this.rules;
   }
 }
+
+/**
+ * The status of a filter list loaded into the Shield, as shown to the user.
+ *
+ * `updatesEnabled` is always `false` in this step: lists are local and are
+ * never downloaded automatically. A future list-update feature will extend
+ * this contract (checking for and applying licensed updates) without changing
+ * how the Shield evaluates rules.
+ */
+export interface FilterListStatus {
+  /** Stable identifier of the list. */
+  readonly id: string;
+  /** Display name of the list. */
+  readonly name: string;
+  /** Whether the list's rules are currently active. */
+  readonly active: boolean;
+  /** The number of rules accepted from this list. */
+  readonly rulesLoaded: number;
+  /** Version of the list contents. */
+  readonly version: string;
+  /** License that permits using this list in the Shield. */
+  readonly license: string;
+  /** ISO date (YYYY-MM-DD) the list contents were last updated. */
+  readonly updatedAt: string;
+  /** Human-readable provenance (where the rules come from). */
+  readonly provenance: string;
+  /** Whether this list can be updated automatically (false for local lists). */
+  readonly updatesEnabled: false;
+}

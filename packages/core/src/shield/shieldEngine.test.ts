@@ -596,3 +596,67 @@ describe('ShieldEngine statistics', () => {
     expect(engine.stats.requestsEvaluated).toBe(0);
   });
 });
+
+describe('ShieldEngine filter list status', () => {
+  it('reports an empty list of lists before any are loaded', () => {
+    const engine = new ShieldEngine();
+    expect(engine.listStatus()).toEqual([]);
+  });
+
+  it('reports the demo list with its metadata and accepted rule count', () => {
+    const engine = new ShieldEngine();
+    engine.addList(demoFilterList);
+    const status = engine.listStatus();
+    expect(status).toHaveLength(1);
+    const list = status[0];
+    if (list === undefined) {
+      throw new Error('expected one loaded list');
+    }
+    expect(list.id).toBe('shodasha-demo-test-list');
+    expect(list.name).toBe('SHODASHA Demo Test List');
+    expect(list.active).toBe(true);
+    expect(list.rulesLoaded).toBe(DEMO_FILTER_RULES.length);
+    expect(list.version).toBe('1.0.0');
+    expect(list.license.length).toBeGreaterThan(0);
+    expect(list.updatedAt).toBe('2026-08-16');
+    expect(list.provenance.length).toBeGreaterThan(0);
+    expect(list.updatesEnabled).toBe(false);
+  });
+
+  it('tracks multiple lists independently', () => {
+    const engine = new ShieldEngine();
+    engine.addList(demoFilterList);
+    engine.addList(
+      new InMemoryFilterListSource({
+        id: 'test-ads',
+        name: 'Test Ads',
+        version: '1.0.0',
+        license: 'MIT',
+        updatedAt: '2026-08-16',
+        provenance: 'test fixture',
+        rules: ADS,
+      }),
+    );
+    const status = engine.listStatus();
+    expect(status).toHaveLength(2);
+    const ads = status.find((s) => s.id === 'test-ads');
+    expect(ads).not.toBeUndefined();
+    expect(ads?.rulesLoaded).toBe(1);
+    expect(ads?.active).toBe(true);
+  });
+});
+
+describe('ShieldEngine site settings snapshot', () => {
+  it('exposes explicit per-site settings for persistence', () => {
+    const engine = new ShieldEngine();
+    engine.setSiteSetting('Example.com', { enabled: false, mode: 'strict' });
+    expect(engine.siteSettingsSnapshot()).toEqual([
+      { site: 'example.com', enabled: false, mode: 'strict' },
+    ]);
+  });
+
+  it('returns an empty snapshot when there are no explicit settings', () => {
+    const engine = new ShieldEngine();
+    expect(engine.siteSettingsSnapshot()).toEqual([]);
+  });
+});

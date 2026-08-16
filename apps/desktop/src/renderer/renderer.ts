@@ -10,8 +10,11 @@
  */
 
 import {
+  PRIVACY_CENTER_URL,
   isBlankTabUrl,
+  isInternalPageUrl,
   type BrowserState,
+  type PrivacyCenterState,
   type ShieldPanelState,
   type TabViewState,
 } from '../shared/browserState.js';
@@ -20,7 +23,10 @@ import {
   type ShortcutAction,
   type ShortcutInput,
 } from '../shared/shortcuts.js';
-import type { ShieldMode } from '@shodasha/core';
+import type {
+  ShieldFilterEvent,
+  ShieldMode,
+} from '@shodasha/core';
 
 /** The bridge surface exposed by the preload script. */
 interface ShodashaBridge {
@@ -59,6 +65,13 @@ interface ShodashaBridge {
     subscribe(): void;
     unsubscribe(): void;
     onPanelChanged(callback: (state: ShieldPanelState) => void): () => void;
+  };
+  privacy: {
+    getState(): Promise<PrivacyCenterState>;
+    resetStatistics(): Promise<void>;
+    getAllowlist(): Promise<string[]>;
+    addToAllowlist(site: string): Promise<{ ok: boolean; reason?: string }>;
+    removeFromAllowlist(site: string): Promise<{ ok: boolean; reason?: string }>;
   };
 }
 
@@ -106,6 +119,45 @@ const siteSettingsAllowlist = document.querySelector<HTMLButtonElement>('#site-s
 const shieldSiteStats = document.querySelector<HTMLElement>('#shield-site-stats');
 const shieldRecent = document.querySelector<HTMLElement>('#shield-recent');
 const shieldRecentList = document.querySelector<HTMLUListElement>('#shield-recent-list');
+const shieldCurrentSite = document.querySelector<HTMLElement>('#shield-current-site');
+const shieldPrivacyCenterButton = document.querySelector<HTMLButtonElement>('#shield-privacy-center');
+
+// Site-settings panel elements.
+const siteSettingsStatEvaluated = document.querySelector<HTMLElement>('#site-settings-stat-evaluated');
+const siteSettingsStatFiltered = document.querySelector<HTMLElement>('#site-settings-stat-filtered');
+const siteSettingsStatTrackers = document.querySelector<HTMLElement>('#site-settings-stat-trackers');
+const siteSettingsStatAds = document.querySelector<HTMLElement>('#site-settings-stat-ads');
+const siteSettingsShieldAction = document.querySelector<HTMLButtonElement>('#site-settings-shield-action');
+const siteSettingsAllowlistAction = document.querySelector<HTMLButtonElement>('#site-settings-allowlist-action');
+
+// Privacy Center elements.
+const privacyCenter = document.querySelector<HTMLElement>('#privacy-center');
+const privacyStatusBadge = document.querySelector<HTMLElement>('#privacy-status-badge');
+const privacyStatusNote = document.querySelector<HTMLElement>('#privacy-status-note');
+const privacyError = document.querySelector<HTMLElement>('#privacy-error');
+const privacyOverviewShield = document.querySelector<HTMLElement>('#privacy-overview-shield');
+const privacyOverviewFiltering = document.querySelector<HTMLElement>('#privacy-overview-filtering');
+const privacyOverviewMode = document.querySelector<HTMLElement>('#privacy-overview-mode');
+const privacyStatEvaluated = document.querySelector<HTMLElement>('#privacy-stat-evaluated');
+const privacyStatAllowed = document.querySelector<HTMLElement>('#privacy-stat-allowed');
+const privacyStatBlocked = document.querySelector<HTMLElement>('#privacy-stat-blocked');
+const privacyStatAds = document.querySelector<HTMLElement>('#privacy-stat-ads');
+const privacyStatTrackers = document.querySelector<HTMLElement>('#privacy-stat-trackers');
+const privacySiteLine = document.querySelector<HTMLElement>('#privacy-site-line');
+const privacyGlobalToggle = document.querySelector<HTMLButtonElement>('#privacy-global-toggle');
+const privacyMode = document.querySelector<HTMLSelectElement>('#privacy-mode');
+const privacyResetStats = document.querySelector<HTMLButtonElement>('#privacy-reset-stats');
+const privacySite = document.querySelector<HTMLElement>('#privacy-site');
+const privacySiteProtection = document.querySelector<HTMLElement>('#privacy-site-protection');
+const privacySiteToggle = document.querySelector<HTMLButtonElement>('#privacy-site-toggle');
+const privacyListsRules = document.querySelector<HTMLElement>('#privacy-lists-rules');
+const privacyListsUpdates = document.querySelector<HTMLElement>('#privacy-lists-updates');
+const privacyLists = document.querySelector<HTMLUListElement>('#privacy-lists');
+const privacyAllowlistForm = document.querySelector<HTMLFormElement>('#privacy-allowlist-add');
+const privacyAllowlistInput = document.querySelector<HTMLInputElement>('#privacy-allowlist-input');
+const privacyAllowlistFeedback = document.querySelector<HTMLElement>('#privacy-allowlist-feedback');
+const privacyAllowlistList = document.querySelector<HTMLUListElement>('#privacy-allowlist-list');
+const privacyRecentList = document.querySelector<HTMLUListElement>('#privacy-recent-list');
 
 // ----------------------------------------------------------------------
 // State
@@ -123,6 +175,10 @@ let shieldUnsubPanel: (() => void) | null = null;
 
 const bridge = window.shodasha?.browser;
 const shieldBridge = window.shodasha?.shield;
+const privacyBridge = window.shodasha?.privacy;
+let privacyCenterActive = false;
+let privacyUnsub: (() => void) | null = null;
+let privacyState: PrivacyCenterState | null = null;
 
 // ----------------------------------------------------------------------
 // Toolbar rendering
@@ -283,14 +339,28 @@ function renderContent(state: BrowserState): void {
     return;
   }
   const active = state.tabs.find((t) => t.id === state.activeTabId) ?? null;
+  const internal =
+    active !== null && isInternalPageUrl(active.url) && !active.showErrorPage;
   const blank =
-    active !== null && isBlankTabUrl(active.url) && !active.showErrorPage;
+    active !== null &&
+    isBlankTabUrl(active.url) &&
+    !active.showErrorPage &&
+    !internal;
 
   if (blank) {
     ntpPage?.removeAttribute('hidden');
   } else {
     ntpPage?.setAttribute('hidden', '');
   }
+
+  if (privacyCenter !== null) {
+    if (internal) {
+      privacyCenter.removeAttribute('hidden');
+    } else {
+      privacyCenter.setAttribute('hidden', '');
+    }
+  }
+  syncPrivacySubscription(internal);
 
   if (active === null) {
     contentFrame.classList.add('empty');
@@ -502,6 +572,9 @@ function handleMenuAction(action: string): void {
     case 'reopen-closed':
       void bridge?.reopenClosedTab();
       break;
+    case 'privacy-center':
+      openPrivacyCenter();
+      break;
   }
   const menu = document.querySelector<HTMLElement>('#menu');
   if (menu !== null) {
@@ -597,6 +670,7 @@ function applyShieldState(state: ShieldPanelState): void {
   setText(shieldStatFiltered, state.stats.requestsBlocked);
   setText(shieldStatTrackers, state.stats.trackersBlocked);
   setText(shieldStatAds, state.stats.adsFiltered);
+  setText(shieldCurrentSite, state.currentSite ?? '\u2014');
   renderShieldSiteStats(state);
   renderShieldRecent(state);
   if (shieldMode !== null) {
@@ -611,6 +685,9 @@ function applyShieldState(state: ShieldPanelState): void {
     shieldSiteSettingsButton.disabled = state.currentSite === null;
   }
   renderSiteSettings(state);
+  if (privacyCenterActive) {
+    void refreshPrivacyCenter();
+  }
 }
 
 function renderShieldSiteStats(state: ShieldPanelState): void {
@@ -655,6 +732,16 @@ function renderShieldRecent(state: ShieldPanelState): void {
 function renderSiteSettings(state: ShieldPanelState): void {
   if (state.currentSite === null) {
     setText(siteSettingsCurrent, '\u2014');
+    setText(siteSettingsStatEvaluated, 0);
+    setText(siteSettingsStatFiltered, 0);
+    setText(siteSettingsStatTrackers, 0);
+    setText(siteSettingsStatAds, 0);
+    if (siteSettingsShieldAction !== null) {
+      siteSettingsShieldAction.disabled = true;
+    }
+    if (siteSettingsAllowlistAction !== null) {
+      siteSettingsAllowlistAction.disabled = true;
+    }
     return;
   }
   setText(siteSettingsCurrent, state.currentSite);
@@ -668,6 +755,23 @@ function renderSiteSettings(state: ShieldPanelState): void {
   if (siteSettingsAllowlist !== null) {
     siteSettingsAllowlist.textContent = state.siteAllowlisted ? 'ON' : 'OFF';
     siteSettingsAllowlist.setAttribute('aria-pressed', String(state.siteAllowlisted));
+  }
+  const stats = state.siteStats;
+  setText(siteSettingsStatEvaluated, stats?.requestsEvaluated ?? 0);
+  setText(siteSettingsStatFiltered, stats?.requestsBlocked ?? 0);
+  setText(siteSettingsStatTrackers, stats?.trackersBlocked ?? 0);
+  setText(siteSettingsStatAds, stats?.adsFiltered ?? 0);
+  if (siteSettingsShieldAction !== null) {
+    siteSettingsShieldAction.disabled = false;
+    siteSettingsShieldAction.textContent = state.siteEnabled
+      ? 'Turn Shield Off'
+      : 'Turn Shield On';
+  }
+  if (siteSettingsAllowlistAction !== null) {
+    siteSettingsAllowlistAction.disabled = false;
+    siteSettingsAllowlistAction.textContent = state.siteAllowlisted
+      ? 'Remove from Allowlist'
+      : 'Add to Allowlist';
   }
 }
 
@@ -731,7 +835,284 @@ function attachShieldHandlers(): void {
     }
     void shieldBridge?.toggleAllowlist(site);
   });
+  shieldPrivacyCenterButton?.addEventListener('click', () => {
+    openPrivacyCenter();
+  });
+  siteSettingsShieldAction?.addEventListener('click', () => {
+    const state = shieldState;
+    const site = state?.currentSite;
+    if (state === null || site === null || site === undefined) {
+      return;
+    }
+    void shieldBridge?.setSiteSetting(site, { enabled: !state.siteEnabled });
+  });
+  siteSettingsAllowlistAction?.addEventListener('click', () => {
+    const state = shieldState;
+    const site = state?.currentSite;
+    if (state === null || site === null || site === undefined) {
+      return;
+    }
+    void shieldBridge?.toggleAllowlist(site);
+  });
 }
+
+/** Navigates the active tab to the SHODASHA Privacy Center (chrome-rendered). */
+function openPrivacyCenter(): void {
+  closeShieldPanels();
+  void bridge?.submitAddress(PRIVACY_CENTER_URL);
+}
+
+function attachPrivacyCenterHandlers(): void {
+  privacyGlobalToggle?.addEventListener('click', () => {
+    const panel = privacyState?.panel;
+    if (panel !== undefined) {
+      void shieldBridge?.setEnabled(!panel.enabled);
+    }
+  });
+  privacyMode?.addEventListener('change', () => {
+    void shieldBridge?.setMode(privacyMode.value as ShieldMode);
+  });
+  privacyResetStats?.addEventListener('click', () => {
+    void privacyBridge?.resetStatistics();
+  });
+  privacySiteToggle?.addEventListener('click', () => {
+    const panel = privacyState?.panel;
+    const site = panel?.currentSite;
+    if (site === null || site === undefined) {
+      return;
+    }
+    void shieldBridge?.setSiteSetting(site, {
+      enabled: !panel?.siteEnabled,
+    });
+  });
+  privacyAllowlistForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const input = privacyAllowlistInput?.value.trim() ?? '';
+    if (input.length === 0) {
+      return;
+    }
+    void privacyBridge?.addToAllowlist(input).then((result) => {
+      if (privacyAllowlistInput !== null) {
+        privacyAllowlistInput.value = '';
+      }
+      setText(
+        privacyAllowlistFeedback,
+        result.ok ? '' : 'That does not look like a valid website address.',
+      );
+      void refreshPrivacyCenter();
+    });
+  });
+}
+
+// ----------------------------------------------------------------------
+// SHODASHA Privacy Center
+// ----------------------------------------------------------------------
+
+/**
+ * Keeps the Privacy Center's live subscription in sync with visibility. Panel
+ * pushes are throttled by the main process, so subscribing while the Privacy
+ * Center is open never floods the renderer.
+ */
+function syncPrivacySubscription(active: boolean): void {
+  if (active === privacyCenterActive) {
+    return;
+  }
+  privacyCenterActive = active;
+  if (active) {
+    privacyUnsub = shieldBridge?.onPanelChanged(() => {
+      void refreshPrivacyCenter();
+    }) ?? null;
+    shieldBridge?.subscribe();
+    void refreshPrivacyCenter();
+  } else {
+    privacyUnsub?.();
+    privacyUnsub = null;
+    shieldBridge?.unsubscribe();
+  }
+}
+
+async function refreshPrivacyCenter(): Promise<void> {
+  if (!privacyCenterActive) {
+    return;
+  }
+  try {
+    const state = await privacyBridge?.getState();
+    renderPrivacyCenter(state ?? null);
+  } catch {
+    renderPrivacyCenter(null);
+  }
+}
+
+function renderPrivacyCenter(state: PrivacyCenterState | null): void {
+  privacyState = state;
+  if (state === null) {
+    if (privacyError !== null) {
+      privacyError.removeAttribute('hidden');
+    }
+    return;
+  }
+  if (privacyError !== null) {
+    privacyError.setAttribute('hidden', '');
+  }
+  const panel = state.panel;
+
+  // Protection status (honest; never claims absolute privacy).
+  if (privacyStatusBadge !== null) {
+    privacyStatusBadge.textContent = state.protectionLabel;
+    privacyStatusBadge.dataset.status = state.protectionStatus;
+  }
+  setText(privacyStatusNote, state.protectionNote);
+
+  // Overview.
+  setText(privacyOverviewShield, panel.enabled ? 'ON' : 'OFF');
+  setText(privacyOverviewFiltering, panel.enabled ? 'ACTIVE' : 'PAUSED');
+  setText(privacyOverviewMode, MODE_LABELS[panel.mode]);
+
+  // Session statistics (real engine counters).
+  setText(privacyStatEvaluated, panel.stats.requestsEvaluated);
+  setText(privacyStatAllowed, panel.stats.requestsAllowed);
+  setText(privacyStatBlocked, panel.stats.requestsBlocked);
+  setText(privacyStatAds, panel.stats.adsFiltered);
+  setText(privacyStatTrackers, panel.stats.trackersBlocked);
+  if (panel.siteStats === null) {
+    setText(privacySiteLine, '\u2014');
+  } else {
+    setText(
+      privacySiteLine,
+      `${String(panel.siteStats.requestsEvaluated)} evaluated \u00b7 ${String(panel.siteStats.requestsBlocked)} filtered`,
+    );
+  }
+
+  // Controls.
+  if (privacyGlobalToggle !== null) {
+    privacyGlobalToggle.textContent = panel.enabled ? 'Shield ON' : 'Shield OFF';
+    privacyGlobalToggle.setAttribute('aria-pressed', String(panel.enabled));
+    privacyGlobalToggle.classList.toggle('shield-toggle-off', !panel.enabled);
+  }
+  if (privacyMode !== null) {
+    privacyMode.value = panel.mode;
+  }
+
+  // Site protection.
+  setText(privacySite, panel.currentSite ?? '\u2014');
+  setText(
+    privacySiteProtection,
+    panel.currentSite === null ? '\u2014' : panel.siteEnabled ? 'ON' : 'OFF',
+  );
+  if (privacySiteToggle !== null) {
+    privacySiteToggle.disabled = panel.currentSite === null;
+    privacySiteToggle.textContent = panel.siteEnabled
+      ? 'Site Shield ON'
+      : 'Site Shield OFF';
+    privacySiteToggle.setAttribute('aria-pressed', String(panel.siteEnabled));
+  }
+
+  renderFilterLists(state);
+  renderPrivacyAllowlist(state.allowlist);
+  renderPrivacyRecent(state.panel.recentEvents);
+}
+
+function renderFilterLists(state: PrivacyCenterState): void {
+  setText(privacyListsRules, state.totalRulesLoaded);
+  if (state.filterLists.length === 0) {
+    setText(
+      privacyListsUpdates,
+      'Local lists (no auto-download)',
+    );
+  } else {
+    setText(
+      privacyListsUpdates,
+      `Local lists \u00b7 last update ${state.filterLists[0]?.updatedAt ?? 'never'}`,
+    );
+  }
+  if (privacyLists === null) {
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const list of state.filterLists) {
+    const item = document.createElement('li');
+    item.className = 'privacy-list-item';
+    const name = document.createElement('span');
+    name.className = 'privacy-list-name';
+    name.textContent = list.name;
+    const meta = document.createElement('span');
+    meta.className = 'privacy-list-meta';
+    meta.textContent = `${list.active ? 'Active' : 'Inactive'} \u00b7 ${String(list.rulesLoaded)} rules \u00b7 v${list.version} \u00b7 ${list.updatedAt}`;
+    const license = document.createElement('span');
+    license.className = 'privacy-list-license';
+    license.textContent = list.license;
+    item.append(name, meta, license);
+    fragment.append(item);
+  }
+  privacyLists.replaceChildren(fragment);
+}
+
+function renderPrivacyAllowlist(allowlist: readonly string[]): void {
+  if (privacyAllowlistList === null) {
+    return;
+  }
+  if (allowlist.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'privacy-empty';
+    empty.textContent = 'No sites allowlisted.';
+    privacyAllowlistList.replaceChildren(empty);
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const site of allowlist) {
+    const item = document.createElement('li');
+    item.className = 'privacy-list-item privacy-allowlist-item';
+    const name = document.createElement('span');
+    name.className = 'privacy-list-name';
+    name.textContent = site;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'privacy-btn privacy-btn-ghost';
+    remove.textContent = 'Remove';
+    remove.setAttribute('aria-label', `Remove ${site} from allowlist`);
+    remove.addEventListener('click', () => {
+      void privacyBridge?.removeFromAllowlist(site).then(() => {
+        void refreshPrivacyCenter();
+      });
+    });
+    item.append(name, remove);
+    fragment.append(item);
+  }
+  privacyAllowlistList.replaceChildren(fragment);
+}
+
+function renderPrivacyRecent(events: readonly ShieldFilterEvent[]): void {
+  if (privacyRecentList === null) {
+    return;
+  }
+  if (events.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'privacy-empty';
+    empty.textContent = 'No filter activity yet this session.';
+    privacyRecentList.replaceChildren(empty);
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  for (const event of events) {
+    const item = document.createElement('li');
+    item.className = `shield-event shield-event-${event.action}`;
+    const label = document.createElement('span');
+    label.className = 'shield-event-label';
+    label.textContent = event.action === 'block' ? 'Blocked' : 'Allowed';
+    const detail = document.createElement('span');
+    detail.className = 'shield-event-detail';
+    detail.textContent = `${event.category} \u00b7 ${event.resourceType} \u00b7 ${event.hostname}`;
+    item.append(label, detail);
+    fragment.append(item);
+  }
+  privacyRecentList.replaceChildren(fragment);
+}
+
+const MODE_LABELS: Record<ShieldMode, string> = {
+  standard: 'Standard',
+  strict: 'Strict',
+  custom: 'Custom',
+};
 
 // ----------------------------------------------------------------------
 // Tab context menu
@@ -868,6 +1249,7 @@ async function boot(): Promise<void> {
   attachTabContextMenuHandlers();
   attachShortcutHandlers();
   attachShieldHandlers();
+  attachPrivacyCenterHandlers();
 
   if (bridge === undefined) {
     const root = document.querySelector<HTMLElement>('#app');

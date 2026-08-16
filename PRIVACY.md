@@ -46,6 +46,40 @@ request pipeline (`webRequest.onBeforeRequest`):
   a recent-activity feed (hostname + category + resource type only) so the
   user always sees exactly what was filtered.
 
+## SHODASHA Privacy Center — the Shield dashboard
+
+The Privacy Center is a SHODASHA-internal page (`shodasha://privacy`) rendered
+by the chrome UI — never by the web content area — so external websites can
+never reach it. It is the single place to review and control the Shield:
+
+- **Protection overview.** Whether the Shield is on, which mode is active, and
+  the current filter-list totals.
+- **Protection status.** An honest status derived from the real engine state:
+  **PROTECTED** (on, current site protected), **LIMITED** (on, but the current
+  site's Shield is off), or **OFF** (globally off). The accompanying note is
+  factual and never claims a "100% private" or guaranteed result.
+- **Session statistics.** Real counters from the Shield engine (requests
+  evaluated / allowed / blocked, ads filtered, trackers blocked) plus the
+  current site's own counters. Nothing is fabricated or extrapolated.
+- **Protection controls.** Global Shield ON/OFF, global mode, reset statistics,
+  and per-site Shield control for the site you are currently viewing.
+- **Filter lists.** Each loaded list with its name, rule count, version,
+  license, and update metadata. Lists are local and never auto-downloaded
+  (`updatesEnabled` is always false in this build).
+- **Allowlist manager.** Add or remove allowlisted sites, with validation in
+  the main process.
+- **Recent protection activity.** The same hostname-only event feed as the
+  popup.
+
+### Privacy Center data handling
+
+- **Persisted settings** (survive restarts): global Shield on/off, global
+  mode, per-site settings, and the allowlist. These are stored locally as a
+  JSON file in Electron's user-data directory.
+- **Never persisted**: session statistics, recent events, and any browsing
+  activity. After a restart, statistics begin at zero; nothing about what you
+  visited is recorded on disk.
+
 ### What it does not do (and never will)
 
 - It does **not** claim to block every ad or tracker. Rule-based filtering
@@ -70,11 +104,14 @@ their license permits the intended use, with their own metadata recorded.
 
 Filter events and statistics are session-only and in-memory: hostnames,
 categories, resource types, and counters. Full URLs, query strings, payloads,
-and browsing history are never collected or logged.
+and browsing history are never collected or logged. The only thing persisted
+on disk is the user's own **Shield settings** (global on/off, mode, per-site
+settings, allowlist) — never statistics, events, or browsing activity.
 
 ## Planned privacy features (roadmap, not yet implemented)
 
-- Persistent filter lists with a list manager UI.
+- Filter-list manager UI with updates (lists are local and static in this
+  build; `updatesEnabled` is always false).
 - Encrypted, at-rest storage for local data.
 - Clear-browsing-data controls.
 - A Privacy Policy document aligned with these principles.

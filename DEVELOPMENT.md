@@ -62,9 +62,12 @@ npm run dev --workspace=@shodasha/desktop
 - [x] Content filtering engine (implement + wire into desktop request pipeline)
 - [x] SHODASHA Shield: rule-based request filtering (block/allow rules,
       categories, modes, per-site control, allowlist, statistics)
+- [x] SHODASHA Privacy Center (`shodasha://privacy`): protection status,
+      session/site statistics, controls, filter-list status, allowlist
+      manager, recent activity; settings persist, statistics are session-only
 - [ ] Tab management
 - [ ] Password manager (with encrypted at-rest storage)
-- [ ] Settings & privacy controls UI
+- [ ] Filter-list manager UI with updates
 - [ ] Android host (`apps/android`)
 - [ ] Play Store packaging
 
@@ -80,6 +83,12 @@ npm run dev --workspace=@shodasha/desktop
   fail-open; keep events and stats hostname-only.
 - When bundling filter lists, always record `license`, `updatedAt`, and
   `provenance` — nothing may be bundled silently (see PRIVACY.md).
+- The Privacy Center reuses the Shield engine as its single source of truth
+  (`ShieldCoordinator.serializePrivacyState()`). Never add a second state
+  manager or fabricated statistics; only real engine counters may be shown.
+- Shield settings persist through `apps/desktop/src/main/settingsStore.ts`
+  (serde lives in `packages/core/src/shield/persistence/shieldSettings.ts`).
+  Never persist statistics or events — they are session-only by design.
 
 The foundation is intentionally feature-free; each feature is added as a
 focused milestone and verified independently.

@@ -8,35 +8,50 @@
  *   Shield decides to block.
  * - Tracks the currently viewed site from the active tab so per-site settings
  *   are honored (explicitly and never silently).
- * - Exposes a minimal IPC surface for the Shield UI (panel + site settings)
- *   and pushes panel state only while the panel is open, throttled, so the
- *   filter never spams the renderer.
+ * - Persists user-controlled Shield settings (global on/off, mode, per-site
+ *   preferences, allowlist) through the settings store — never statistics or
+ *   browsing activity.
+ * - Exposes a minimal IPC surface for the Shield UI (popup, site settings,
+ *   and the Privacy Center) and pushes state only while at least one UI is
+ *   subscribed, throttled, so the filter never spams the renderer.
  *
- * This is the browser's own controlled request pipeline: nothing here touches
- * third-party servers, bypasses website security, or defeats any site's
- * protection mechanisms.
+ * All IPC inputs are validated here in the main process; the renderer is never
+ * trusted. This is the browser's own controlled request pipeline: nothing here
+ * touches third-party servers, bypasses website security, or defeats any
+ * site's protection mechanisms.
  */
 
 import { ipcMain, type Session, type WebContents } from 'electron';
 import {
   ShieldEngine,
+  applyShieldSettings,
+  collectShieldSettings,
   demoFilterList,
   hostnameFromUrl,
+  isShieldMode,
   isValidHostname,
   normalizeHostname,
   originFromUrl,
   type ResourceType,
-  type ShieldMode,
   type ShieldRequest,
   type TabManager,
 } from '@shodasha/core';
-import { IPC, type ShieldPanelState } from '../shared/browserState.js';
+import {
+  IPC,
+  isInternalPageUrl,
+  protectionStatusFor,
+  type PrivacyCenterState,
+  type ShieldPanelState,
+} from '../shared/browserState.js';
+import type { ShieldSettingsStore } from './settingsStore.js';
 
 export interface ShieldCoordinatorOptions {
   /** The session whose requests the Shield filters (shared default session). */
   readonly session: Session;
   /** The chrome webContents used to push panel state to the UI. */
   readonly chrome: WebContents;
+  /** Persistence store for user-controlled Shield settings. */
+  readonly settingsStore: ShieldSettingsStore;
 }
 
 /** Electron's onBeforeRequest resourceType → Shield ResourceType mapping. */
@@ -69,14 +84,19 @@ export class ShieldCoordinator {
   private readonly engine = new ShieldEngine();
   private readonly session: Session;
   private readonly chrome: WebContents;
+  private readonly settingsStore: ShieldSettingsStore;
   private manager: TabManager | null = null;
-  private panelSubscribed = false;
+  private panelSubscribers = 0;
   private lastPanelPush = 0;
   private disposed = false;
 
   public constructor(options: ShieldCoordinatorOptions) {
     this.session = options.session;
     this.chrome = options.chrome;
+    this.settingsStore = options.settingsStore;
+    // Apply persisted settings before the request filter runs so saved
+    // preferences are honored from the very first request.
+    applyShieldSettings(this.engine, this.settingsStore.load());
     this.installIpcHandlers();
     this.installRequestFilter();
     // Ship the deterministic local test list (reserved .test domains only).
@@ -100,7 +120,8 @@ export class ShieldCoordinator {
   /** Releases resources. The coordinator is app-scoped, so this is optional. */
   public dispose(): void {
     this.disposed = true;
-    this.panelSubscribed = false;
+    this.panelSubscribers = 0;
+    this.settingsStore.flush();
   }
 
   // ------------------------------------------------------------ IPC
@@ -111,12 +132,14 @@ export class ShieldCoordinator {
     ipcMain.handle(IPC.shieldSetEnabled, (_e, enabled: unknown) => {
       this.engine.setEnabled(enabled === true);
       this.pushPanelState();
+      this.persist();
     });
 
     ipcMain.handle(IPC.shieldSetMode, (_e, mode: unknown) => {
       if (isShieldMode(mode)) {
         this.engine.setMode(mode);
         this.pushPanelState();
+        this.persist();
       }
     });
 
@@ -128,13 +151,42 @@ export class ShieldCoordinator {
       this.handleToggleAllowlist(site);
     });
 
+    ipcMain.handle(IPC.privacyGetState, () => this.serializePrivacyState());
+
+    ipcMain.handle(IPC.shieldResetStats, () => {
+      this.engine.resetStats();
+      this.pushPanelState();
+    });
+
+    ipcMain.handle(IPC.shieldGetAllowlist, () => [...this.engine.allowlist]);
+
+    ipcMain.handle(IPC.shieldAddAllowlist, (_e, site: unknown) => {
+      const host = shieldSiteOf(site);
+      if (host === null || !this.engine.addAllowlist(host)) {
+        return { ok: false, reason: 'invalid' };
+      }
+      this.pushPanelState();
+      this.persist();
+      return { ok: true };
+    });
+
+    ipcMain.handle(IPC.shieldRemoveAllowlist, (_e, site: unknown) => {
+      const host = shieldSiteOf(site);
+      if (host === null || !this.engine.removeAllowlist(host)) {
+        return { ok: false, reason: 'absent' };
+      }
+      this.pushPanelState();
+      this.persist();
+      return { ok: true };
+    });
+
     ipcMain.on(IPC.shieldSubscribe, () => {
-      this.panelSubscribed = true;
+      this.panelSubscribers += 1;
       this.pushPanelState();
     });
 
     ipcMain.on(IPC.shieldUnsubscribe, () => {
-      this.panelSubscribed = false;
+      this.panelSubscribers = Math.max(0, this.panelSubscribers - 1);
     });
   }
 
@@ -154,6 +206,7 @@ export class ShieldCoordinator {
       ...(isShieldMode(mode) ? { mode } : {}),
     });
     this.pushPanelState();
+    this.persist();
   }
 
   private handleToggleAllowlist(site: unknown): void {
@@ -163,6 +216,7 @@ export class ShieldCoordinator {
     }
     this.engine.toggleAllowlist(host);
     this.pushPanelState();
+    this.persist();
   }
 
   // ---------------------------------------------------- request filter
@@ -220,6 +274,10 @@ export class ShieldCoordinator {
     if (active === null) {
       return null;
     }
+    if (isInternalPageUrl(active.url)) {
+      // Internal pages (e.g. the Privacy Center) are not websites.
+      return null;
+    }
     return hostnameFromUrl(active.url);
   }
 
@@ -250,6 +308,23 @@ export class ShieldCoordinator {
     };
   }
 
+  private serializePrivacyState(): PrivacyCenterState {
+    const panel = this.serializePanelState();
+    const protection = protectionStatusFor(panel);
+    return {
+      panel,
+      allowlist: this.engine.allowlist,
+      filterLists: this.engine.listStatus(),
+      totalRulesLoaded: this.engine.ruleCount,
+      protectionStatus: protection.status,
+      protectionLabel: protection.label,
+      protectionNote: protection.note,
+      localProcessing: true,
+      telemetryEnabled: false,
+      browsingAnalyticsEnabled: false,
+    };
+  }
+
   private maybePushPanelThrottled(): void {
     if (!this.panelSubscribed || this.disposed) {
       return;
@@ -270,6 +345,18 @@ export class ShieldCoordinator {
       return;
     }
     this.chrome.send(IPC.shieldPanelChanged, this.serializePanelState());
+  }
+
+  /** Whether at least one UI surface is subscribed to panel pushes. */
+  private get panelSubscribed(): boolean {
+    return this.panelSubscribers > 0;
+  }
+
+  // ------------------------------------------------------- persistence
+
+  /** Queues a debounced save of the current user-controlled settings. */
+  private persist(): void {
+    this.settingsStore.scheduleSave(collectShieldSettings(this.engine));
   }
 }
 
@@ -294,8 +381,4 @@ function shieldSiteOf(site: unknown): string | null {
   // Accept both a bare hostname and a full URL.
   const host = hostnameFromUrl(site) ?? normalizeHostname(site);
   return isValidHostname(host) ? host : null;
-}
-
-function isShieldMode(value: unknown): value is ShieldMode {
-  return value === 'standard' || value === 'strict' || value === 'custom';
 }

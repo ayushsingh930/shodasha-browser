@@ -82,12 +82,16 @@ describe('ShieldStatsCounter', () => {
       requestsEvaluated: 1,
       requestsBlocked: 1,
       requestsAllowed: 1,
+      trackersBlocked: 0,
+      adsFiltered: 1,
     });
     expect(counter.snapshotForSite('other-site.org').requestsEvaluated).toBe(1);
     expect(counter.snapshotForSite('unvisited.net')).toEqual({
       requestsEvaluated: 0,
       requestsBlocked: 0,
       requestsAllowed: 0,
+      trackersBlocked: 0,
+      adsFiltered: 0,
     });
   });
 
