@@ -10,9 +10,13 @@
  */
 
 import {
+  BOOKMARKS_URL,
   PRIVACY_CENTER_URL,
+  internalPageInfoFor,
   isBlankTabUrl,
-  isInternalPageUrl,
+  searchBookmarks,
+  sortBookmarks,
+  type BookmarkState,
   type BrowserState,
   type PrivacyCenterState,
   type ShieldPanelState,
@@ -24,8 +28,14 @@ import {
   type ShortcutInput,
 } from '../shared/shortcuts.js';
 import type {
+  AddBookmarkResult,
+  Bookmark,
+  BookmarkCollection,
+  BookmarkFolder,
+  BookmarkSort,
   ShieldFilterEvent,
   ShieldMode,
+  UpdateBookmarkResult,
 } from '@shodasha/core';
 
 /** The bridge surface exposed by the preload script. */
@@ -72,6 +82,29 @@ interface ShodashaBridge {
     getAllowlist(): Promise<string[]>;
     addToAllowlist(site: string): Promise<{ ok: boolean; reason?: string }>;
     removeFromAllowlist(site: string): Promise<{ ok: boolean; reason?: string }>;
+  };
+  bookmarks: {
+    getState(): Promise<BookmarkState>;
+    add(input: {
+      title: string;
+      url: string;
+      folderId: string | null;
+    }): Promise<AddBookmarkResult>;
+    update(
+      id: string,
+      patch: { title?: string; url?: string; folderId?: string | null },
+    ): Promise<UpdateBookmarkResult>;
+    delete(id: string): Promise<boolean>;
+    createFolder(name: string): Promise<BookmarkFolder | null>;
+    renameFolder(id: string, name: string): Promise<boolean>;
+    deleteFolder(id: string): Promise<boolean>;
+    move(id: string, folderId: string | null): Promise<boolean>;
+    search(query: string): Promise<Bookmark[]>;
+    setToolbarVisible(visible: boolean): Promise<void>;
+    onStateChanged(callback: (state: BookmarkState) => void): () => void;
+    onOpenAddDialog(
+      callback: (data: { url: string; title: string }) => void,
+    ): () => void;
   };
 }
 
@@ -159,6 +192,28 @@ const privacyAllowlistFeedback = document.querySelector<HTMLElement>('#privacy-a
 const privacyAllowlistList = document.querySelector<HTMLUListElement>('#privacy-allowlist-list');
 const privacyRecentList = document.querySelector<HTMLUListElement>('#privacy-recent-list');
 
+// Bookmark UI elements.
+const bookmarkButton = document.querySelector<HTMLButtonElement>('#btn-bookmark');
+const bookmarksBar = document.querySelector<HTMLElement>('#bookmarks-bar');
+const bookmarksBarItems = document.querySelector<HTMLElement>('#bookmarks-bar-items');
+const bookmarksBarToggle = document.querySelector<HTMLButtonElement>('#bookmarks-bar-toggle');
+const bookmarksManager = document.querySelector<HTMLElement>('#bookmarks-manager');
+const bookmarksManagerSearch = document.querySelector<HTMLInputElement>('#bookmarks-manager-search');
+const bookmarksManagerSort = document.querySelector<HTMLSelectElement>('#bookmarks-manager-sort');
+const bookmarksManagerNewFolder = document.querySelector<HTMLButtonElement>('#bookmarks-manager-new-folder');
+const bookmarksFoldersList = document.querySelector<HTMLElement>('#bookmarks-folders-list');
+const bookmarksManagerEmpty = document.querySelector<HTMLElement>('#bookmarks-manager-empty');
+const bookmarksManagerList = document.querySelector<HTMLUListElement>('#bookmarks-manager-list');
+const bookmarkDialogBackdrop = document.querySelector<HTMLElement>('#bookmark-dialog-backdrop');
+const bookmarkDialogTitle = document.querySelector<HTMLElement>('#bookmark-dialog-title');
+const bookmarkDialogForm = document.querySelector<HTMLFormElement>('#bookmark-dialog-form');
+const bookmarkDialogName = document.querySelector<HTMLInputElement>('#bookmark-dialog-name');
+const bookmarkDialogUrl = document.querySelector<HTMLInputElement>('#bookmark-dialog-url');
+const bookmarkDialogFolder = document.querySelector<HTMLSelectElement>('#bookmark-dialog-folder');
+const bookmarkDialogError = document.querySelector<HTMLElement>('#bookmark-dialog-error');
+const bookmarkDialogDelete = document.querySelector<HTMLButtonElement>('#bookmark-dialog-delete');
+const bookmarkDialogCancel = document.querySelector<HTMLButtonElement>('#bookmark-dialog-cancel');
+
 // ----------------------------------------------------------------------
 // State
 // ----------------------------------------------------------------------
@@ -176,9 +231,19 @@ let shieldUnsubPanel: (() => void) | null = null;
 const bridge = window.shodasha?.browser;
 const shieldBridge = window.shodasha?.shield;
 const privacyBridge = window.shodasha?.privacy;
+const bookmarksBridge = window.shodasha?.bookmarks;
 let privacyCenterActive = false;
 let privacyUnsub: (() => void) | null = null;
 let privacyState: PrivacyCenterState | null = null;
+
+// Bookmark state (single source of truth lives in the main process).
+let bookmarkState: BookmarkState | null = null;
+let bookmarkManagerActive = false;
+/** The bookmark being edited in the dialog, or null when adding. */
+let bookmarkDialogId: string | null = null;
+/** The current folder filter in the Bookmark Manager (null = all). */
+let managerFolderFilter: string | null = null;
+let managerSort: BookmarkSort = 'recent';
 
 // ----------------------------------------------------------------------
 // Toolbar rendering
@@ -339,8 +404,11 @@ function renderContent(state: BrowserState): void {
     return;
   }
   const active = state.tabs.find((t) => t.id === state.activeTabId) ?? null;
-  const internal =
-    active !== null && isInternalPageUrl(active.url) && !active.showErrorPage;
+  const internalInfo =
+    active !== null && !active.showErrorPage
+      ? internalPageInfoFor(active.url)
+      : null;
+  const internal = internalInfo !== null;
   const blank =
     active !== null &&
     isBlankTabUrl(active.url) &&
@@ -354,13 +422,24 @@ function renderContent(state: BrowserState): void {
   }
 
   if (privacyCenter !== null) {
-    if (internal) {
+    if (internalInfo?.kind === 'privacy') {
       privacyCenter.removeAttribute('hidden');
     } else {
       privacyCenter.setAttribute('hidden', '');
     }
   }
-  syncPrivacySubscription(internal);
+  syncPrivacySubscription(internalInfo?.kind === 'privacy');
+
+  // The Bookmark Manager is chrome-rendered, like the Privacy Center.
+  bookmarkManagerActive = internalInfo?.kind === 'bookmarks';
+  if (bookmarksManager !== null) {
+    if (bookmarkManagerActive) {
+      bookmarksManager.removeAttribute('hidden');
+      renderBookmarksManager();
+    } else {
+      bookmarksManager.setAttribute('hidden', '');
+    }
+  }
 
   if (active === null) {
     contentFrame.classList.add('empty');
@@ -468,6 +547,9 @@ function dispatchShortcut(action: ShortcutAction): void {
     case 'hard-reload':
       void bridge?.hardReload();
       break;
+    case 'toggle-bookmarks-bar':
+      toggleBookmarksBar();
+      break;
   }
 }
 
@@ -574,6 +656,9 @@ function handleMenuAction(action: string): void {
       break;
     case 'privacy-center':
       openPrivacyCenter();
+      break;
+    case 'bookmarks':
+      openBookmarksManager();
       break;
   }
   const menu = document.querySelector<HTMLElement>('#menu');
@@ -860,6 +945,544 @@ function attachShieldHandlers(): void {
 function openPrivacyCenter(): void {
   closeShieldPanels();
   void bridge?.submitAddress(PRIVACY_CENTER_URL);
+}
+
+/** Navigates the active tab to the SHODASHA Bookmark Manager. */
+function openBookmarksManager(): void {
+  closeShieldPanels();
+  void bridge?.submitAddress(BOOKMARKS_URL);
+}
+
+// ----------------------------------------------------------------------
+// Bookmarks
+// ----------------------------------------------------------------------
+
+/** Applies bookmark state pushed from the main process. */
+function applyBookmarkState(state: BookmarkState): void {
+  bookmarkState = state;
+  renderStar();
+  renderBookmarksBar();
+  if (bookmarkManagerActive) {
+    renderBookmarksManager();
+  }
+}
+
+/** Renders the star button state for the current page. */
+function renderStar(): void {
+  if (bookmarkButton === null) {
+    return;
+  }
+  const activeUrl = bookmarkState?.activeUrl ?? null;
+  const hasPage = activeUrl !== null && activeUrl.length > 0;
+  const bookmarked = hasPage && (bookmarkState?.activeBookmarkId ?? null) !== null;
+  bookmarkButton.disabled = !hasPage;
+  bookmarkButton.textContent = bookmarked ? '\u2605' : '\u2606';
+  bookmarkButton.setAttribute('aria-pressed', String(bookmarked));
+  bookmarkButton.title = bookmarked ? 'Edit bookmark' : 'Bookmark this page';
+  bookmarkButton.classList.toggle('bookmarked', bookmarked);
+}
+
+/** Renders the optional bookmarks toolbar row (below the tab bar). */
+function renderBookmarksBar(): void {
+  if (bookmarksBar === null) {
+    return;
+  }
+  const visible = bookmarkState?.toolbarVisible === true;
+  bookmarksBar.hidden = !visible;
+  if (!visible || bookmarksBarItems === null) {
+    return;
+  }
+  // The toolbar shows unfiled bookmarks, sorted by name, scrolling horizontally
+  // when there are more than fit (overflow never breaks the layout).
+  const collection = bookmarkState?.collection;
+  if (collection === undefined) {
+    return;
+  }
+  const rootBookmarks = collection.bookmarks.filter(
+    (bookmark) => bookmark.folderId === null,
+  );
+  const fragment = document.createDocumentFragment();
+  for (const bookmark of sortBookmarks(rootBookmarks, 'name-asc')) {
+    fragment.appendChild(buildBookmarkBarItem(bookmark));
+  }
+  bookmarksBarItems.replaceChildren(fragment);
+}
+
+function buildBookmarkBarItem(bookmark: Bookmark): HTMLElement {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'bookmark-bar-item';
+  el.title = bookmark.url;
+
+  const icon = document.createElement('span');
+  icon.className = 'bookmark-favicon';
+  icon.setAttribute('aria-hidden', 'true');
+  if (bookmark.favicon) {
+    const img = document.createElement('img');
+    img.src = bookmark.favicon;
+    img.alt = '';
+    img.loading = 'lazy';
+    icon.replaceChildren(img);
+  } else {
+    icon.textContent = '\u2606';
+  }
+
+  const label = document.createElement('span');
+  label.className = 'bookmark-bar-label';
+  label.textContent = bookmark.title;
+  label.title = bookmark.url;
+
+  el.append(icon, label);
+  el.addEventListener('click', () => {
+    void bridge?.submitAddress(bookmark.url);
+  });
+  return el;
+}
+
+/** Toggles the bookmarks toolbar (Ctrl+Shift+B). */
+function toggleBookmarksBar(): void {
+  const visible = bookmarkState?.toolbarVisible === true;
+  void bookmarksBridge?.setToolbarVisible(!visible);
+}
+
+// ------------------------------------------------------------- manager
+
+function renderBookmarksManager(): void {
+  const collection = bookmarkState?.collection;
+  if (collection === undefined) {
+    return;
+  }
+  renderManagerFolders(collection);
+  renderManagerList(collection);
+}
+
+function renderManagerFolders(collection: BookmarkCollection): void {
+  if (bookmarksFoldersList === null) {
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+
+  const allRow = document.createElement('div');
+  allRow.className =
+    'bookmarks-folder-row' + (managerFolderFilter === null ? ' active' : '');
+  const allButton = document.createElement('button');
+  allButton.type = 'button';
+  allButton.className = 'bookmarks-folder';
+  allButton.textContent = 'All bookmarks';
+  allButton.addEventListener('click', () => {
+    managerFolderFilter = null;
+    renderBookmarksManager();
+  });
+  allRow.appendChild(allButton);
+  fragment.appendChild(allRow);
+
+  for (const folder of collection.folders) {
+    const row = document.createElement('div');
+    row.className =
+      'bookmarks-folder-row' + (managerFolderFilter === folder.id ? ' active' : '');
+
+    const select = document.createElement('button');
+    select.type = 'button';
+    select.className = 'bookmarks-folder';
+    select.textContent = folder.name;
+    select.title = folder.name;
+    select.addEventListener('click', () => {
+      managerFolderFilter = folder.id;
+      renderBookmarksManager();
+    });
+
+    const rename = document.createElement('button');
+    rename.type = 'button';
+    rename.className = 'bookmarks-folder-action';
+    rename.textContent = '\u270e';
+    rename.title = `Rename ${folder.name}`;
+    rename.setAttribute('aria-label', `Rename ${folder.name}`);
+    rename.addEventListener('click', () => {
+      renameFolderPrompt(folder.id, folder.name);
+    });
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'bookmarks-folder-action';
+    remove.textContent = '\u00d7';
+    remove.title = `Delete ${folder.name}`;
+    remove.setAttribute('aria-label', `Delete ${folder.name}`);
+    remove.addEventListener('click', () => {
+      void deleteFolder(folder.id);
+    });
+
+    row.append(select, rename, remove);
+    fragment.appendChild(row);
+  }
+
+  bookmarksFoldersList.replaceChildren(fragment);
+}
+
+function renderManagerList(collection: BookmarkCollection): void {
+  if (bookmarksManagerList === null || bookmarksManagerEmpty === null) {
+    return;
+  }
+  const query = bookmarksManagerSearch?.value ?? '';
+  let bookmarks = searchBookmarks(collection.bookmarks, query);
+  if (managerFolderFilter !== null) {
+    bookmarks = bookmarks.filter(
+      (bookmark) => bookmark.folderId === managerFolderFilter,
+    );
+  }
+  bookmarks = sortBookmarks(bookmarks, managerSort);
+
+  if (bookmarks.length === 0) {
+    bookmarksManagerEmpty.hidden = false;
+    bookmarksManagerList.replaceChildren();
+    return;
+  }
+  bookmarksManagerEmpty.hidden = true;
+
+  const folderNames = new Map(
+    collection.folders.map((folder) => [folder.id, folder.name]),
+  );
+  const fragment = document.createDocumentFragment();
+  for (const bookmark of bookmarks) {
+    fragment.appendChild(
+      buildManagerItem(bookmark, folderNames.get(bookmark.folderId ?? '') ?? null),
+    );
+  }
+  bookmarksManagerList.replaceChildren(fragment);
+}
+
+function buildManagerItem(
+  bookmark: Bookmark,
+  folderName: string | null,
+): HTMLElement {
+  const item = document.createElement('li');
+  item.className = 'bookmarks-manager-item';
+
+  const icon = document.createElement('span');
+  icon.className = 'bookmark-favicon bookmark-favicon-lg';
+  icon.setAttribute('aria-hidden', 'true');
+  if (bookmark.favicon) {
+    const img = document.createElement('img');
+    img.src = bookmark.favicon;
+    img.alt = '';
+    img.loading = 'lazy';
+    icon.replaceChildren(img);
+  } else {
+    icon.textContent = '\u2606';
+  }
+
+  const main = document.createElement('div');
+  main.className = 'bookmarks-manager-item-main';
+  const title = document.createElement('span');
+  title.className = 'bookmarks-manager-item-title';
+  title.textContent = bookmark.title;
+  title.title = bookmark.title;
+  const meta = document.createElement('span');
+  meta.className = 'bookmarks-manager-item-meta';
+  meta.textContent = folderName === null ? bookmark.url : `${folderName} \u00b7 ${bookmark.url}`;
+  main.append(title, meta);
+
+  const actions = document.createElement('div');
+  actions.className = 'bookmarks-manager-item-actions';
+
+  const open = document.createElement('button');
+  open.type = 'button';
+  open.className = 'privacy-btn privacy-btn-ghost';
+  open.textContent = 'Open';
+  open.addEventListener('click', () => {
+    void bridge?.submitAddress(bookmark.url);
+  });
+
+  const edit = document.createElement('button');
+  edit.type = 'button';
+  edit.className = 'privacy-btn privacy-btn-ghost';
+  edit.textContent = 'Edit';
+  edit.addEventListener('click', () => {
+    showBookmarkDialog({ editing: bookmark, url: bookmark.url, title: bookmark.title });
+  });
+
+  const move = document.createElement('select');
+  move.className = 'shield-select bookmark-move-select';
+  move.setAttribute('aria-label', `Move ${bookmark.title} to folder`);
+  move.appendChild(new Option('Root', '__root__'));
+  for (const folder of bookmarkState?.collection.folders ?? []) {
+    move.appendChild(new Option(folder.name, folder.id));
+  }
+  move.value = bookmark.folderId ?? '__root__';
+  move.addEventListener('change', () => {
+    const target = move.value === '__root__' ? null : move.value;
+    void bookmarksBridge?.move(bookmark.id, target);
+  });
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'privacy-btn privacy-btn-ghost bookmark-delete-btn';
+  remove.textContent = 'Delete';
+  remove.addEventListener('click', () => {
+    void bookmarksBridge?.delete(bookmark.id);
+  });
+
+  actions.append(open, edit, move, remove);
+  item.append(icon, main, actions);
+  return item;
+}
+
+async function deleteFolder(id: string): Promise<void> {
+  await bookmarksBridge?.deleteFolder(id);
+  if (managerFolderFilter === id) {
+    managerFolderFilter = null;
+  }
+}
+
+/** Shows a small inline editor for creating a folder. */
+function beginNewFolder(): void {
+  if (bookmarksFoldersList === null) {
+    return;
+  }
+  removeInlineFolderEditor();
+  const row = document.createElement('div');
+  row.className = 'bookmarks-inline-editor';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Folder name';
+  input.setAttribute('aria-label', 'New folder name');
+  const create = document.createElement('button');
+  create.type = 'button';
+  create.textContent = 'Create';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.textContent = 'Cancel';
+  const commit = () => {
+    const name = input.value.trim();
+    row.remove();
+    if (name.length > 0) {
+      void bookmarksBridge?.createFolder(name);
+    }
+  };
+  create.addEventListener('click', commit);
+  cancel.addEventListener('click', () => {
+    row.remove();
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      commit();
+    } else if (event.key === 'Escape') {
+      row.remove();
+    }
+  });
+  row.append(input, create, cancel);
+  bookmarksFoldersList.appendChild(row);
+  input.focus();
+}
+
+/** Shows a small inline editor for renaming a folder. */
+function renameFolderPrompt(id: string, currentName: string): void {
+  if (bookmarksFoldersList === null) {
+    return;
+  }
+  removeInlineFolderEditor();
+  const row = document.createElement('div');
+  row.className = 'bookmarks-inline-editor';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = currentName;
+  input.setAttribute('aria-label', 'Rename folder');
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.textContent = 'Save';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.textContent = 'Cancel';
+  const commit = () => {
+    const name = input.value.trim();
+    row.remove();
+    if (name.length > 0) {
+      void bookmarksBridge?.renameFolder(id, name);
+    }
+  };
+  save.addEventListener('click', commit);
+  cancel.addEventListener('click', () => {
+    row.remove();
+  });
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      commit();
+    } else if (event.key === 'Escape') {
+      row.remove();
+    }
+  });
+  row.append(input, save, cancel);
+  bookmarksFoldersList.appendChild(row);
+  input.focus();
+  input.select();
+}
+
+function removeInlineFolderEditor(): void {
+  bookmarksFoldersList
+    ?.querySelector('.bookmarks-inline-editor')
+    ?.remove();
+}
+
+// ------------------------------------------------------------- dialog
+
+/**
+ * Opens the add/edit bookmark dialog. `editing` is the bookmark being edited,
+ * or null when adding a new one; `url`/`title` prefill the fields (the main
+ * process validates the final data before anything is stored).
+ */
+function showBookmarkDialog(opts: {
+  editing: Bookmark | null;
+  url: string;
+  title: string;
+}): void {
+  if (bookmarkDialogBackdrop === null) {
+    return;
+  }
+  bookmarkDialogId = opts.editing?.id ?? null;
+  if (bookmarkDialogTitle !== null) {
+    bookmarkDialogTitle.textContent =
+      opts.editing === null ? 'Add Bookmark' : 'Edit Bookmark';
+  }
+  if (bookmarkDialogName !== null) {
+    bookmarkDialogName.value = opts.editing?.title ?? opts.title;
+  }
+  if (bookmarkDialogUrl !== null) {
+    bookmarkDialogUrl.value = opts.editing?.url ?? opts.url;
+  }
+  if (bookmarkDialogDelete !== null) {
+    bookmarkDialogDelete.hidden = opts.editing === null;
+  }
+  populateFolderSelect(opts.editing?.folderId ?? null);
+  if (bookmarkDialogError !== null) {
+    bookmarkDialogError.hidden = true;
+  }
+  bookmarkDialogBackdrop.hidden = false;
+  bookmarkDialogName?.focus();
+  bookmarkDialogName?.select();
+}
+
+function populateFolderSelect(currentFolderId: string | null): void {
+  if (bookmarkDialogFolder === null) {
+    return;
+  }
+  bookmarkDialogFolder.replaceChildren();
+  bookmarkDialogFolder.appendChild(new Option('Root', '__root__'));
+  for (const folder of bookmarkState?.collection.folders ?? []) {
+    bookmarkDialogFolder.appendChild(new Option(folder.name, folder.id));
+  }
+  bookmarkDialogFolder.value = currentFolderId ?? '__root__';
+}
+
+function closeBookmarkDialog(): void {
+  if (bookmarkDialogBackdrop !== null) {
+    bookmarkDialogBackdrop.hidden = true;
+  }
+  bookmarkDialogId = null;
+}
+
+function showDialogError(message: string): void {
+  if (bookmarkDialogError === null) {
+    return;
+  }
+  bookmarkDialogError.textContent = message;
+  bookmarkDialogError.hidden = false;
+}
+
+async function submitBookmarkDialog(): Promise<void> {
+  const name = bookmarkDialogName?.value.trim() ?? '';
+  const url = bookmarkDialogUrl?.value.trim() ?? '';
+  const folderValue = bookmarkDialogFolder?.value ?? '__root__';
+  const folderId = folderValue === '__root__' ? null : folderValue;
+  if (name.length === 0 || url.length === 0) {
+    showDialogError('Please enter a name and a URL.');
+    return;
+  }
+  try {
+    if (bookmarkDialogId === null) {
+      const result = await bookmarksBridge?.add({ title: name, url, folderId });
+      if (result?.ok === false) {
+        showDialogError('Unable to save bookmark.');
+        return;
+      }
+    } else {
+      const result = await bookmarksBridge?.update(bookmarkDialogId, {
+        title: name,
+        url,
+        folderId,
+      });
+      if (result?.ok === false) {
+        showDialogError('Unable to save bookmark.');
+        return;
+      }
+    }
+    closeBookmarkDialog();
+  } catch {
+    showDialogError('Unable to save bookmark.');
+  }
+}
+
+function onDialogDelete(): void {
+  if (bookmarkDialogId === null) {
+    return;
+  }
+  void bookmarksBridge?.delete(bookmarkDialogId);
+  closeBookmarkDialog();
+}
+
+/** Star button: open the edit dialog when bookmarked, the add dialog otherwise. */
+function onStarClick(): void {
+  const state = bookmarkState;
+  if (state === null) {
+    return;
+  }
+  const activeUrl = state.activeUrl;
+  if (activeUrl === null || activeUrl.length === 0) {
+    return;
+  }
+  const active = currentState.tabs.find((t) => t.id === currentState.activeTabId);
+  const pageTitle = active?.title ?? activeUrl;
+  const existingId = state.activeBookmarkId;
+  const existing =
+    existingId === null
+      ? null
+      : (state.collection.bookmarks.find((b) => b.id === existingId) ?? null);
+  if (existing !== null) {
+    showBookmarkDialog({
+      editing: existing,
+      url: activeUrl,
+      title: existing.title,
+    });
+  } else {
+    showBookmarkDialog({ editing: null, url: activeUrl, title: pageTitle });
+  }
+}
+
+function attachBookmarkHandlers(): void {
+  bookmarkButton?.addEventListener('click', onStarClick);
+  bookmarksBarToggle?.addEventListener('click', toggleBookmarksBar);
+  bookmarksManagerSearch?.addEventListener('input', () => {
+    renderBookmarksManager();
+  });
+  bookmarksManagerSort?.addEventListener('change', () => {
+    managerSort = bookmarksManagerSort.value as BookmarkSort;
+    renderBookmarksManager();
+  });
+  bookmarksManagerNewFolder?.addEventListener('click', beginNewFolder);
+  bookmarkDialogForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    void submitBookmarkDialog();
+  });
+  bookmarkDialogCancel?.addEventListener('click', closeBookmarkDialog);
+  bookmarkDialogDelete?.addEventListener('click', onDialogDelete);
+  bookmarkDialogBackdrop?.addEventListener('click', (event) => {
+    if (event.target === bookmarkDialogBackdrop) {
+      closeBookmarkDialog();
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && bookmarkDialogBackdrop?.hidden === false) {
+      closeBookmarkDialog();
+    }
+  });
 }
 
 function attachPrivacyCenterHandlers(): void {
@@ -1250,6 +1873,7 @@ async function boot(): Promise<void> {
   attachShortcutHandlers();
   attachShieldHandlers();
   attachPrivacyCenterHandlers();
+  attachBookmarkHandlers();
 
   if (bridge === undefined) {
     const root = document.querySelector<HTMLElement>('#app');
@@ -1262,6 +1886,18 @@ async function boot(): Promise<void> {
   bridge.onFocusAddressBar(focusAddressInput);
   const initial = await bridge.getState();
   applyState(initial);
+
+  // Bookmarks: a single subscription at boot keeps the star, the toolbar, and
+  // the Bookmark Manager in sync. The main process pushes on every mutation
+  // and (throttled) on navigation.
+  bookmarksBridge?.onStateChanged(applyBookmarkState);
+  bookmarksBridge?.onOpenAddDialog(({ url, title }) => {
+    showBookmarkDialog({ editing: null, url, title });
+  });
+  const bookmarkInitial = await bookmarksBridge?.getState();
+  if (bookmarkInitial !== undefined) {
+    applyBookmarkState(bookmarkInitial);
+  }
 }
 
 void boot();

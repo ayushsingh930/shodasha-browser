@@ -14,9 +14,10 @@ wire the contracts into their platform.
 └───────────────────────────────┬──────────────────────────────┘
                                 │  imports @shodasha/core
 ┌───────────────────────────────▼──────────────────────────────┐
-│                      packages/core                           │
-│  url/    privacy/    security/    storage/    logging/        │
-│  (pure TypeScript, platform-agnostic, strict)                │
+│                       packages/core                           │
+│  url/    privacy/    shield/    bookmarks/    security/        │
+│  storage/    logging/                                          │
+│  (pure TypeScript, platform-agnostic, strict)                  │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -63,6 +64,12 @@ wire the contracts into their platform.
   cache, aggregate + per-site session statistics, and a privacy-safe recent
   events buffer. It performs no I/O and never fabricates or stores
   per-request history.
+- **`core/src/bookmarks`** — the SHODASHA bookmark model and manager: a flat
+  collection of bookmarks plus folders, stable ids, URL validation (only
+  `http:`/`https:` and SHODASHA internal pages are accepted), conservative
+  duplicate detection, local search/sort, and fail-safe persistence
+  serialization. Pure and host-agnostic: bookmarks are never executed as
+  code, and the manager performs no I/O.
 - **`core/src/security`** — secret loading, bounded secret reads, and
   redaction helpers.
 - **`core/src/storage`** — interfaces (`KeyValueStore`, `EncryptedStore`) that
@@ -79,9 +86,22 @@ wire the contracts into their platform.
   Privacy Center state, and persists settings through the settings store.
 - **`apps/desktop/src/main/settingsStore`** — debounced, atomic, fail-safe
   JSON persistence for Shield settings (settings only; never statistics).
+- **`apps/desktop/src/main/bookmarkStore`** — debounced, atomic, fail-safe
+  JSON persistence for the bookmark collection (a single `bookmarks.json`
+  file); a separate small `bookmarks-ui.json` holds the toolbar-visibility
+  preference so the collection format stays pure. Bookmarks never leave the
+  device.
+- **`apps/desktop/src/main/bookmarkCoordinator`** — owns the single source of
+  truth for bookmarks (the core `BookmarkManager`) plus its persistence, and
+  exposes a narrow, validated IPC surface. Derives the star-button state from
+  the active tab, captures a safe page favicon at add time, pushes bookmark
+  state to the chrome UI (immediately for mutations, throttled with a trailing
+  push for navigation changes), and notifies the layout of toolbar changes.
+  Every renderer input is validated here in the main process.
 - **`apps/desktop/src/preload`** — isolated preload bridge.
 - **`apps/desktop/src/renderer`** — sandboxed UI (toolbar, tabs, NTP, Shield
-  popup, site-settings panel, and the chrome-rendered Privacy Center).
+  popup, site-settings panel, and the chrome-rendered Privacy Center and
+  Bookmark Manager).
 
 ## SHODASHA Shield — request filtering
 
@@ -200,6 +220,64 @@ persisted — statistics, events, and browsing activity are session-only and
 never touch disk. Loaded filter lists report their status through the core
 engine's `listStatus()` (name, rules, version, license, updatedAt, provenance,
 `updatesEnabled: false`).
+
+## SHODASHA Bookmark Manager
+
+The Bookmark Manager is a chrome-rendered internal page at
+`shodasha://bookmarks` (no custom scheme registration — it is a model-level
+URL, like the Privacy Center). Bookmarks are owned by a **single source of
+truth**: the core `BookmarkManager` held by the `BookmarkCoordinator` in the
+main process.
+
+### Data model
+
+Bookmarks are a flat collection: a list of `Bookmark` records plus a list of
+`BookmarkFolder` records (`packages/core/src/bookmarks/bookmarkModel.ts`).
+Every bookmark has a stable, unique id (never the URL, because the same URL
+can appear with different metadata), a title, the validated URL, timestamps,
+an optional `folderId` (`null` = root/unfiled), and an optional favicon URL
+captured safely from the page at add time.
+
+### URL validation
+
+Only `http:`, `https:`, and SHODASHA's own internal pages
+(`shodasha://privacy`, `shodasha://bookmarks`) may be stored. Dangerous
+schemes (`javascript:`, `data:`, `file:`, and any other) are rejected so a
+bookmark can never become an execution vector. A conservative normalized key
+(`bookmarkKeyForUrl`) is used only for duplicate detection; the stored URL is
+never rewritten.
+
+### Single source of truth and state flow
+
+- The `BookmarkCoordinator` holds the core manager and the `BookmarkStore`
+  that persists it locally. It derives the star-button state (active URL →
+  bookmarked id) and pushes bookmark state to the chrome UI: immediately for
+  mutations, throttled (400 ms) with a trailing push for tab-navigation
+  changes. The renderer keeps a single subscription at boot, so the star, the
+  toolbar, and the manager page all stay in sync.
+- The star button opens the add dialog for the active page (or the edit
+  dialog when the page is already bookmarked). The page context menu's
+  "Bookmark this page" action sends trusted `{url, title}` from the main
+  process to open a pre-filled dialog.
+- The bookmarks toolbar shows unfiled bookmarks, sorted by name, scrolling
+  horizontally when there are more than fit. It is toggled with Ctrl+Shift+B
+  and its visibility preference is persisted.
+- Every renderer input is validated in the main process (`parseAddInput`,
+  `parseUpdateInput`); the renderer is never trusted. Favicons are captured on
+  the main side from the active tab and only ever used as `<img>` sources.
+
+### Persistence boundary
+
+Bookmarks survive restarts via `BookmarkStore`
+(`apps/desktop/src/main/bookmarkStore.ts`): a `bookmarks.json` file in
+Electron's user-data directory, loaded fail-safely (corrupt data degrades to
+an empty collection) and saved debounced (300 ms) with an atomic tmp+rename
+write, flushed on `before-quit`. The host-agnostic serialization lives in the
+core (`packages/core/src/bookmarks/bookmarkPersistence.ts`). The
+toolbar-visibility preference is kept in a separate `bookmarks-ui.json` so the
+collection format stays pure. Deleting a folder moves its bookmarks to the
+root — bookmarks are never lost. Bookmarks are stored locally on the device
+and are never sent anywhere.
 
 ## Content filtering seam
 

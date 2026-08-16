@@ -7,6 +7,9 @@
  */
 
 import type {
+  Bookmark,
+  BookmarkCollection,
+  BookmarkSort,
   FilterListStatus,
   SecurityState,
   ShieldFilterEvent,
@@ -74,13 +77,44 @@ export function isBlankTabUrl(url: string): boolean {
 /** The internal URL of the SHODASHA Privacy Center. */
 export const PRIVACY_CENTER_URL = 'shodasha://privacy';
 
+/** The internal URL of the SHODASHA Bookmark Manager. */
+export const BOOKMARKS_URL = 'shodasha://bookmarks';
+
+/** The kinds of internal pages the chrome UI can render. */
+export type InternalPageKind = 'privacy' | 'bookmarks';
+
+/** Metadata for a SHODASHA internal page. */
+export interface InternalPageInfo {
+  /** The canonical internal URL. */
+  readonly url: string;
+  readonly kind: InternalPageKind;
+  /** The title shown in the tab. */
+  readonly title: string;
+}
+
+/**
+ * Resolves a URL to its internal-page metadata, or null when it is not an
+ * internal page. Used by the chrome UI to decide which section to render.
+ */
+export function internalPageInfoFor(url: string): InternalPageInfo | null {
+  const normalized = url.trim().toLowerCase();
+  if (normalized === PRIVACY_CENTER_URL) {
+    return { url: PRIVACY_CENTER_URL, kind: 'privacy', title: 'Privacy Center' };
+  }
+  if (normalized === BOOKMARKS_URL) {
+    return { url: BOOKMARKS_URL, kind: 'bookmarks', title: 'Bookmarks' };
+  }
+  return null;
+}
+
 /**
  * Whether a URL is a SHODASHA internal page rendered by the browser chrome
  * (never by web content). Internal pages are safe, trusted pages such as the
- * Privacy Center; they cannot be loaded from an external website.
+ * Privacy Center and the Bookmark Manager; they cannot be loaded from an
+ * external website.
  */
 export function isInternalPageUrl(url: string): boolean {
-  return url.trim().toLowerCase() === PRIVACY_CENTER_URL;
+  return internalPageInfoFor(url) !== null;
 }
 
 /**
@@ -155,6 +189,68 @@ export interface PrivacyCenterState {
   readonly browsingAnalyticsEnabled: boolean;
 }
 
+/**
+ * The full bookmark state pushed to the UI. It mirrors the single source of
+ * truth in the main process (the core BookmarkManager) plus the derived values
+ * the UI needs for the star button and the bookmarks toolbar.
+ */
+export interface BookmarkState {
+  /** The full bookmark collection (bookmarks + folders). */
+  readonly collection: BookmarkCollection;
+  /** Whether the bookmarks toolbar is currently shown. */
+  readonly toolbarVisible: boolean;
+  /**
+   * The URL of the active tab, or null when there is no navigable page
+   * (e.g. a blank new-tab page).
+   */
+  readonly activeUrl: string | null;
+  /**
+   * The id of the bookmark for the active page, or null when the active page
+   * is not bookmarked. Drives the star button state.
+   */
+  readonly activeBookmarkId: string | null;
+}
+
+/**
+ * Case-insensitive local search across bookmark titles and URLs. Runs entirely
+ * on this device against the pushed collection; no remote service is involved.
+ */
+export function searchBookmarks(
+  bookmarks: readonly Bookmark[],
+  query: string,
+): Bookmark[] {
+  const needle = query.trim().toLowerCase();
+  if (needle.length === 0) {
+    return [...bookmarks];
+  }
+  return bookmarks.filter((bookmark) => {
+    return (
+      bookmark.title.toLowerCase().includes(needle) ||
+      bookmark.url.toLowerCase().includes(needle)
+    );
+  });
+}
+
+/** Sorts bookmarks by the requested order (stable, no mutation). */
+export function sortBookmarks(
+  bookmarks: readonly Bookmark[],
+  order: BookmarkSort,
+): Bookmark[] {
+  const copy = [...bookmarks];
+  if (order === 'name-asc') {
+    copy.sort((a, b) =>
+      a.title.localeCompare(b.title, undefined, { sensitivity: 'base' }),
+    );
+  } else if (order === 'name-desc') {
+    copy.sort((a, b) =>
+      b.title.localeCompare(a.title, undefined, { sensitivity: 'base' }),
+    );
+  } else {
+    copy.sort((a, b) => b.createdAt - a.createdAt);
+  }
+  return copy;
+}
+
 /** IPC channel names used between renderer and main. */
 export const IPC = {
   getState: 'browser:get-state',
@@ -189,4 +285,16 @@ export const IPC = {
   shieldGetAllowlist: 'shield:get-allowlist',
   shieldAddAllowlist: 'shield:add-allowlist',
   shieldRemoveAllowlist: 'shield:remove-allowlist',
+  bookmarkGetState: 'bookmarks:get-state',
+  bookmarkStateChanged: 'bookmarks:state-changed',
+  bookmarkAdd: 'bookmarks:add',
+  bookmarkUpdate: 'bookmarks:update',
+  bookmarkDelete: 'bookmarks:delete',
+  bookmarkCreateFolder: 'bookmarks:create-folder',
+  bookmarkRenameFolder: 'bookmarks:rename-folder',
+  bookmarkDeleteFolder: 'bookmarks:delete-folder',
+  bookmarkMove: 'bookmarks:move',
+  bookmarkSearch: 'bookmarks:search',
+  bookmarkSetToolbarVisible: 'bookmarks:set-toolbar-visible',
+  bookmarkOpenAddDialog: 'bookmarks:open-add-dialog',
 } as const;

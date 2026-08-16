@@ -130,6 +130,38 @@ export {
   MAX_SECRET_LENGTH,
 } from './security/secrets.js';
 
+export {
+  createBookmarkId,
+  isValidBookmarkUrl,
+  bookmarkKeyForUrl,
+  searchBookmarks,
+  sortBookmarks,
+  BOOKMARK_COLLECTION_VERSION,
+} from './bookmarks/bookmarkModel.js';
+export type {
+  Bookmark,
+  BookmarkCollection,
+  BookmarkEntry,
+  BookmarkFolder,
+  BookmarkSort,
+} from './bookmarks/bookmarkModel.js';
+export {
+  parseBookmarkCollection,
+  serializeBookmarkCollection,
+  emptyBookmarkCollection,
+} from './bookmarks/bookmarkPersistence.js';
+export {
+  BookmarkManager,
+  MAX_BOOKMARK_TITLE_LENGTH,
+  MAX_FOLDER_NAME_LENGTH,
+} from './bookmarks/bookmarkManager.js';
+export type {
+  AddBookmarkInput,
+  AddBookmarkResult,
+  UpdateBookmarkInput,
+  UpdateBookmarkResult,
+} from './bookmarks/bookmarkManager.js';
+
 export type {
   KeyValueStore,
   EncryptedStore,

@@ -67,6 +67,15 @@
 
         <div class="toolbar-actions">
           <button
+            id="btn-bookmark"
+            class="icon-button bookmark-button"
+            title="Bookmark this page"
+            aria-label="Bookmark this page"
+            aria-pressed="false"
+          >
+            &#9734;
+          </button>
+          <button
             id="btn-shield"
             class="icon-button shield-button"
             title="SHODASHA Shield"
@@ -228,12 +237,26 @@
             <button type="button" data-action="close-tab">Close tab</button>
             <button type="button" data-action="reload">Reload</button>
             <button type="button" data-action="privacy-center">Privacy Center</button>
+            <button type="button" data-action="bookmarks">Bookmarks</button>
             <button type="button" data-action="reopen-closed">Reopen closed tab</button>
           </nav>
         </div>
       </header>
 
       <nav id="tab-bar" class="tab-bar" aria-label="Tabs"></nav>
+
+      <div id="bookmarks-bar" class="bookmarks-bar" hidden>
+        <div id="bookmarks-bar-items" class="bookmarks-bar-items"></div>
+        <button
+          type="button"
+          id="bookmarks-bar-toggle"
+          class="bookmarks-bar-toggle"
+          title="Hide bookmarks bar (Ctrl+Shift+B)"
+          aria-label="Hide bookmarks bar"
+        >
+          &#10005;
+        </button>
+      </div>
 
       <main id="content-frame" class="content-frame"></main>
 
@@ -414,6 +437,48 @@
         </div>
       </section>
 
+      <section id="bookmarks-manager" class="bookmarks-manager" hidden aria-label="SHODASHA Bookmark Manager">
+        <div class="bookmarks-manager-inner">
+          <header class="bookmarks-manager-header">
+            <div>
+              <h1 class="bookmarks-manager-title">Bookmarks</h1>
+              <p class="bookmarks-manager-subtitle">Your bookmarks are stored locally on this device.</p>
+            </div>
+            <div class="bookmarks-manager-controls">
+              <input
+                id="bookmarks-manager-search"
+                type="text"
+                placeholder="Search bookmarks"
+                aria-label="Search bookmarks"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <select id="bookmarks-manager-sort" class="shield-select" aria-label="Sort bookmarks">
+                <option value="recent">Recently added</option>
+                <option value="name-asc">Name A-Z</option>
+                <option value="name-desc">Name Z-A</option>
+              </select>
+              <button type="button" id="bookmarks-manager-new-folder" class="privacy-btn">
+                New Folder
+              </button>
+            </div>
+          </header>
+
+          <div class="bookmarks-manager-layout">
+            <aside class="bookmarks-folders" aria-label="Bookmark folders">
+              <div id="bookmarks-folders-list" class="bookmarks-folders-list"></div>
+            </aside>
+            <div class="bookmarks-list-area">
+              <div id="bookmarks-manager-empty" class="bookmarks-empty" hidden>
+                <p class="bookmarks-empty-title">No bookmarks yet</p>
+                <p class="bookmarks-empty-note">Bookmark a page to find it here.</p>
+              </div>
+              <ul id="bookmarks-manager-list" class="bookmarks-manager-list"></ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="new-tab-page" class="new-tab-page" hidden>
         <div class="ntp-mark" aria-hidden="true">S</div>
         <h1 class="ntp-brand">SHODASHA</h1>
@@ -429,6 +494,42 @@
         />
         <p class="ntp-note">Your browsing stays on this device.</p>
       </section>
+
+      <div id="bookmark-dialog-backdrop" class="dialog-backdrop" hidden>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bookmark-dialog-title"
+          class="bookmark-dialog"
+        >
+          <h2 id="bookmark-dialog-title" class="bookmark-dialog-title">Add Bookmark</h2>
+          <form id="bookmark-dialog-form">
+            <label class="bookmark-dialog-field">
+              <span>Name</span>
+              <input id="bookmark-dialog-name" type="text" spellcheck="false" autocomplete="off" />
+            </label>
+            <label class="bookmark-dialog-field">
+              <span>URL</span>
+              <input id="bookmark-dialog-url" type="text" spellcheck="false" autocomplete="off" />
+            </label>
+            <label class="bookmark-dialog-field">
+              <span>Folder</span>
+              <select id="bookmark-dialog-folder" class="shield-select"></select>
+            </label>
+            <p id="bookmark-dialog-error" class="bookmark-dialog-error" hidden role="alert"></p>
+            <div class="bookmark-dialog-actions">
+              <button type="button" id="bookmark-dialog-delete" class="privacy-btn bookmark-dialog-delete" hidden>
+                Delete
+              </button>
+              <span class="bookmark-dialog-spacer"></span>
+              <button type="button" id="bookmark-dialog-cancel" class="privacy-btn">Cancel</button>
+              <button type="submit" id="bookmark-dialog-save" class="privacy-btn privacy-btn-primary">
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <nav id="tab-context-menu" class="context-menu" hidden>
         <button type="button" data-action="new-tab">New tab</button>

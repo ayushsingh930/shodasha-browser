@@ -108,6 +108,38 @@ and browsing history are never collected or logged. The only thing persisted
 on disk is the user's own **Shield settings** (global on/off, mode, per-site
 settings, allowlist) — never statistics, events, or browsing activity.
 
+## SHODASHA Bookmark Manager — local bookmarks
+
+The Bookmark Manager is a SHODASHA-internal page (`shodasha://bookmarks`)
+rendered by the chrome UI — never by the web content area — so external
+websites can never reach it. It lets the user store, organize, search, and
+open bookmarks:
+
+- **Add / edit / delete.** The star button on the toolbar (or the page
+  context menu's "Bookmark this page") adds the current page; bookmarked
+  pages show a filled star and open the edit dialog. Bookmarks can be
+  deleted from the manager.
+- **Folders.** Bookmarks can be filed into folders; folders can be created,
+  renamed, and deleted. Deleting a folder moves its bookmarks to the root —
+  bookmarks are never lost.
+- **Search and sort.** The manager filters titles and URLs locally (case
+  insensitive) and can be sorted by recency or name.
+- **Toolbar.** An optional bookmarks toolbar (Ctrl+Shift+B) shows unfiled
+  bookmarks for one-click access.
+
+### Bookmark data handling
+
+- **Persisted locally** (survive restarts): the bookmark collection and the
+  toolbar-visibility preference, as JSON files in Electron's user-data
+  directory. Writes are atomic and fail-safe; a corrupt file degrades to an
+  empty collection.
+- **Never sent anywhere.** Bookmarks are stored on this device. There is no
+  sync, no remote service, and no telemetry. Local search runs entirely on
+  this device.
+- **Never executed as code.** A bookmark is a validated URL string plus
+  display text; opening one is a normal navigation. Only `http:`/`https:` and
+  SHODASHA internal pages may be bookmarked.
+
 ## Planned privacy features (roadmap, not yet implemented)
 
 - Filter-list manager UI with updates (lists are local and static in this

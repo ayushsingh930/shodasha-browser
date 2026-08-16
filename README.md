@@ -19,6 +19,10 @@ working request filter (SHODASHA Shield) wired into the desktop browser.
       status, session/site statistics, protection controls, filter-list
       status, allowlist manager, recent activity; settings persist across
       restarts (statistics are session-only)
+- ✅ SHODASHA Bookmark Manager — persistent bookmarks and folders, star
+      button, add/edit/delete/move/search, an optional bookmarks toolbar
+      (Ctrl+Shift+B), and a chrome-rendered `shodasha://bookmarks` manager;
+      stored locally on this device
 - ⏳ Tab management
 - ⏳ Password manager
 - ⏳ Android / Play Store packaging
@@ -61,6 +65,7 @@ npm run dev          # builds and launches the desktop shell (Electron)
 │   ├── src/privacy/        Content-filtering contracts & engine
 │   ├── src/shield/         SHODASHA Shield: rule engine, allowlist, modes,
 │   │                       stats & events (host-agnostic)
+│   ├── src/bookmarks/      Bookmark model, manager & persistence (host-agnostic)
 │   ├── src/security/       Secret handling & redaction
 │   ├── src/storage/        Storage abstraction interfaces
 │   └── src/logging/        Privacy-safe structured logger

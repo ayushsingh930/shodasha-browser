@@ -64,10 +64,40 @@ security controls.
 - **All IPC inputs are validated in the main process.** Per-site settings and
   allowlist entries are normalized through hostname validation before they
   touch the engine; malformed input is rejected, never partially applied.
+  Bookmark add/update inputs are validated the same way (`javascript:`,
+  `data:`, `file:`, and other dangerous schemes are rejected before anything
+  is stored).
 - **Settings persistence is scoped and fail-safe.** Only Shield settings
   (global on/off, mode, per-site, allowlist) are written to disk, in a
   debounced, atomic write. Statistics, events, and browsing activity are never
   persisted. A corrupt settings file degrades to defaults instead of crashing.
+
+## SHODASHA Bookmark Manager — security posture
+
+- **Bookmarks are data, never code.** A bookmark is a validated URL string
+  plus display text. Opening one is a normal navigation exactly like typing
+  the URL; bookmarks are never executed, rendered into privileged context, or
+  injected into a page.
+- **Strict URL validation.** Only `http:`, `https:`, and SHODASHA's own
+  internal pages may be bookmarked. `javascript:`, `data:`, `file:`, and every
+  other scheme are rejected in the main process before storage.
+- **All bookmark IPC is validated in the main process.** Titles, URLs, folder
+  ids, and folder names are type-checked and length-bounded; malformed input
+  is rejected (or degrades safely), never partially applied. The renderer is
+  never trusted.
+- **Favicons are passive resources only.** A favicon captured from the active
+  page is stored as a plain URL and the UI only ever uses it as an `<img>`
+  source — it cannot execute or reach privileged APIs.
+- **Bookmarks never leave the device.** The collection is stored locally in
+  the user-data directory as JSON. There is no sync, no telemetry, and no
+  upload of bookmark data.
+- **The Bookmark Manager is unreachable from web content.** `shodasha://bookmarks`
+  is a chrome-rendered internal page like the Privacy Center. The privileged
+  bridge (`window.shodasha`) exists only in the chrome renderer; the sandboxed
+  webview has no `window.shodasha`, `process`, or `require`.
+- **Fail-safe persistence.** A corrupt bookmark file degrades to an empty
+  collection instead of crashing; writes are atomic (tmp + rename) and
+  debounced, and flushed on `before-quit`.
 
 ## Explicit non-goals (never do these)
 

@@ -65,6 +65,9 @@ npm run dev --workspace=@shodasha/desktop
 - [x] SHODASHA Privacy Center (`shodasha://privacy`): protection status,
       session/site statistics, controls, filter-list status, allowlist
       manager, recent activity; settings persist, statistics are session-only
+- [x] SHODASHA Bookmark Manager (`shodasha://bookmarks`): persistent local
+      bookmarks + folders, star button, add/edit/delete/move/search, optional
+      toolbar (Ctrl+Shift+B)
 - [ ] Tab management
 - [ ] Password manager (with encrypted at-rest storage)
 - [ ] Filter-list manager UI with updates
@@ -89,6 +92,27 @@ npm run dev --workspace=@shodasha/desktop
 - Shield settings persist through `apps/desktop/src/main/settingsStore.ts`
   (serde lives in `packages/core/src/shield/persistence/shieldSettings.ts`).
   Never persist statistics or events — they are session-only by design.
+
+## Working on Bookmarks
+
+- Core model/manager tests: `npm test --workspace=@shodasha/core` (the
+  bookmarks module has its own unit tests plus a real-browser smoke test).
+- The desktop resolves `@shodasha/core` from its built `dist`; after core
+  changes, rebuild the core before type-checking or launching the desktop:
+  `npm run build --workspace=@shodasha/core`.
+- The single source of truth is the core `BookmarkManager` held by
+  `apps/desktop/src/main/bookmarkCoordinator.ts`. Keep one source of truth;
+  never add a second bookmark store.
+- The renderer runs as a raw browser ES module (no bundler) and cannot import
+  `@shodasha/core` at runtime. Renderer-reachable pure helpers (search/sort)
+  live in `apps/desktop/src/shared/browserState.ts`; keep runtime imports out
+  of the renderer.
+- All bookmark IPC is validated in the main process (`parseAddInput`,
+  `parseUpdateInput`). URLs are restricted to `http:`/`https:` and SHODASHA
+  internal pages; dangerous schemes must always be rejected before storage.
+- Bookmarks persist through `apps/desktop/src/main/bookmarkStore.ts`
+  (serde lives in `packages/core/src/bookmarks/bookmarkPersistence.ts`).
+  Bookmark data never leaves the device.
 
 The foundation is intentionally feature-free; each feature is added as a
 focused milestone and verified independently.

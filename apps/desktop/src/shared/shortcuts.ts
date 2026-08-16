@@ -19,7 +19,8 @@ export type ShortcutAction =
   | 'prev-tab'
   | 'focus-address'
   | 'reload'
-  | 'hard-reload';
+  | 'hard-reload'
+  | 'toggle-bookmarks-bar';
 
 /** A normalized view of a key event (shared across Electron and DOM). */
 export interface ShortcutInput {
@@ -66,6 +67,9 @@ export function shortcutActionFor(input: ShortcutInput): ShortcutAction | null {
     }
     if (key === 'r') {
       return input.shift ? 'hard-reload' : 'reload';
+    }
+    if (key === 'b' && input.shift) {
+      return 'toggle-bookmarks-bar';
     }
     return null;
   }

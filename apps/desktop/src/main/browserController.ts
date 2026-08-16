@@ -11,6 +11,7 @@
 
 import {
   app,
+  Menu,
   WebContentsView,
   ipcMain,
   type BrowserWindow,
@@ -23,9 +24,9 @@ import { classifyLoadError } from '@shodasha/core';
 import type { NavigationError } from '@shodasha/core';
 import {
   IPC,
+  internalPageInfoFor,
   isBlankTabUrl,
   isInternalPageUrl,
-  PRIVACY_CENTER_URL,
   type BrowserState,
   type TabViewState,
 } from '../shared/browserState.js';
@@ -43,6 +44,9 @@ import {
 /** Height reserved for the chrome (toolbar + tab bar). */
 export const CHROME_HEIGHT = 88;
 
+/** Height of the optional bookmarks toolbar row. */
+export const BOOKMARKS_BAR_HEIGHT = 36;
+
 export interface BrowserControllerOptions {
   /** The owning window. */
   readonly window: BrowserWindow;
@@ -50,6 +54,21 @@ export interface BrowserControllerOptions {
   readonly manager: TabManager;
   /** The search engine used by the address bar. */
   readonly searchEngine?: { id: string; name: string; urlTemplate: string };
+  /**
+   * Called when the page context menu's "Bookmark this page" action fires,
+   * with the page's URL and title (trusted, captured by the main process).
+   */
+  readonly onBookmarkPage?: (url: string, title: string) => void;
+  /**
+   * Called when the toggle-bookmarks-bar shortcut (Ctrl+Shift+B) is pressed
+   * while a page has focus. The bookmark coordinator owns the preference.
+   */
+  readonly onToggleBookmarksBar?: () => void;
+  /**
+   * Returns whether the bookmarks toolbar is visible so the webview layout
+   * leaves room for it below the tab bar.
+   */
+  readonly bookmarksBarVisible?: () => boolean;
 }
 
 /** A live tab: its core id plus its Electron view. */
@@ -72,6 +91,9 @@ export class BrowserController {
   private readonly manager: TabManager;
   private readonly searchEngine;
   private readonly logger: Logger;
+  private readonly onBookmarkPage: ((url: string, title: string) => void) | undefined;
+  private readonly onToggleBookmarksBar: (() => void) | undefined;
+  private readonly bookmarksBarVisible: (() => boolean) | undefined;
   private readonly liveTabs = new Map<string, LiveTab>();
   private readonly chrome: WebContents;
   private readonly session: Session;
@@ -82,6 +104,9 @@ export class BrowserController {
     this.window = options.window;
     this.manager = options.manager;
     this.searchEngine = options.searchEngine ?? DEFAULT_SEARCH_ENGINE;
+    this.onBookmarkPage = options.onBookmarkPage;
+    this.onToggleBookmarksBar = options.onToggleBookmarksBar;
+    this.bookmarksBarVisible = options.bookmarksBarVisible;
     this.logger = new Logger({ level: 'info' });
     this.chrome = options.window.webContents;
     this.session = this.chrome.session;
@@ -180,9 +205,10 @@ export class BrowserController {
       return;
     }
     const trimmed = input.trim();
-    if (isInternalPageUrl(trimmed)) {
+    const internal = internalPageInfoFor(trimmed);
+    if (internal !== null) {
       // SHODASHA internal pages are never web URLs; route them directly.
-      this.navigateInternal(active.id, PRIVACY_CENTER_URL);
+      this.navigateInternal(active.id, internal.url);
       return;
     }
     const interpretation = classifyAddressInput(input);
@@ -425,6 +451,9 @@ export class BrowserController {
       case 'hard-reload':
         this.activeTabHardReload();
         break;
+      case 'toggle-bookmarks-bar':
+        this.onToggleBookmarksBar?.();
+        break;
     }
   }
 
@@ -557,15 +586,40 @@ export class BrowserController {
       }
       return { action: 'deny' };
     });
+
+    // A right-click on a page opens a native menu with "Bookmark this page".
+    // The page's own JS context menu is never modified or injected into; the
+    // current page URL comes from Electron's params (trusted main-side data).
+    wc.on('context-menu', (_event, params) => {
+      if (this.onBookmarkPage === undefined) {
+        return;
+      }
+      const pageUrl = params.pageURL.length > 0 ? params.pageURL : null;
+      const target = pageUrl ?? this.manager.getTab(live.id)?.url ?? '';
+      if (target.length === 0 || isInternalPageUrl(target)) {
+        return;
+      }
+      const title = this.manager.getTab(live.id)?.title ?? '';
+      const menu = Menu.buildFromTemplate([
+        {
+          label: 'Bookmark this page',
+          click: () => {
+            this.onBookmarkPage?.(target, title);
+          },
+        },
+      ]);
+      menu.popup({ window: this.window });
+    });
   }
 
   private loadInView(live: LiveTab, url: string, recordHistory = true): void {
     if (live.wc.isDestroyed()) {
       return;
     }
-    if (isInternalPageUrl(url)) {
+    const internal = internalPageInfoFor(url);
+    if (internal !== null) {
       // Internal pages are rendered by the chrome UI, never by the webview.
-      this.navigateInternal(live.id, PRIVACY_CENTER_URL, recordHistory);
+      this.navigateInternal(live.id, internal.url, recordHistory);
       return;
     }
     if (!isAllowedNavigationUrl(url)) {
@@ -596,16 +650,17 @@ export class BrowserController {
    * the tab model records the internal URL and its security state.
    */
   private navigateInternal(tabId: string, url: string, recordHistory = true): void {
-    if (this.manager.getTab(tabId) === null) {
+    const info = internalPageInfoFor(url);
+    if (this.manager.getTab(tabId) === null || info === null) {
       return;
     }
     if (recordHistory) {
-      this.manager.beginNavigation(tabId, url);
+      this.manager.beginNavigation(tabId, info.url);
     } else {
-      this.manager.setUrl(tabId, url);
+      this.manager.setUrl(tabId, info.url);
       this.manager.setLoading(tabId, false);
     }
-    this.manager.setTitle(tabId, 'Privacy Center');
+    this.manager.setTitle(tabId, info.title);
     this.manager.setSecurityState(tabId, 'internal');
     this.relayout();
     this.pushState();
@@ -654,11 +709,15 @@ export class BrowserController {
 
   // --------------------------------------------------------- layout
 
-  private relayout(): void {
+  /** Recomputes webview bounds after chrome layout changes (window resize,
+   * tab changes, bookmarks bar toggles). */
+  public relayout(): void {
     const [width, height] = this.window.getContentSize();
     if (width === undefined || height === undefined) {
       return;
     }
+    // Leave room for the optional bookmarks toolbar below the tab bar.
+    const top = CHROME_HEIGHT + (this.bookmarksBarVisible?.() === true ? BOOKMARKS_BAR_HEIGHT : 0);
     for (const live of this.liveTabs.values()) {
       // A view whose webContents died externally must never be touched.
       if (live.wc.isDestroyed()) {
@@ -675,7 +734,7 @@ export class BrowserController {
       const isBlank = tab.active && isBlankTabUrl(tab.url) && !tab.showErrorPage;
       const isInternal = tab.active && isInternalPageUrl(tab.url);
       if (tab.active && !isBlank && !isInternal) {
-        live.view.setBounds({ x: 0, y: CHROME_HEIGHT, width, height: height - CHROME_HEIGHT });
+        live.view.setBounds({ x: 0, y: top, width, height: height - top });
         live.view.setVisible(true);
       } else {
         live.view.setVisible(false);

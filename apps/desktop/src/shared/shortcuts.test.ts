@@ -53,6 +53,12 @@ describe('shortcutActionFor', () => {
     );
   });
 
+  it('maps Ctrl+Shift+B to toggle-bookmarks-bar', () => {
+    expect(
+      shortcutActionFor(key({ key: 'b', ctrl: true, shift: true })),
+    ).toBe('toggle-bookmarks-bar');
+  });
+
   it('maps F5 to reload', () => {
     expect(shortcutActionFor(key({ key: 'F5' }))).toBe('reload');
     expect(shortcutActionFor(key({ key: 'f5' }))).toBe('reload');
@@ -80,5 +86,9 @@ describe('shortcutActionFor', () => {
   it('does not map Ctrl+Shift+W or Ctrl+Shift+L', () => {
     expect(shortcutActionFor(key({ key: 'w', ctrl: true, shift: true }))).toBeNull();
     expect(shortcutActionFor(key({ key: 'l', ctrl: true, shift: true }))).toBeNull();
+  });
+
+  it('does not map Ctrl+B (without shift) to bookmarks', () => {
+    expect(shortcutActionFor(key({ key: 'b', ctrl: true }))).toBeNull();
   });
 });

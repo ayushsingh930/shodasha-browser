@@ -10,6 +10,7 @@ import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Logger, TabManager } from '@shodasha/core';
+import { BookmarkCoordinator } from './bookmarkCoordinator.js';
 import { BrowserController } from './browserController.js';
 import { ShieldCoordinator } from './shieldCoordinator.js';
 import { ShieldSettingsStore } from './settingsStore.js';
@@ -21,6 +22,7 @@ const logger = new Logger({ level: 'info' });
 let controller: BrowserController | null = null;
 let shield: ShieldCoordinator | null = null;
 let settingsStore: ShieldSettingsStore | null = null;
+let bookmarks: BookmarkCoordinator | null = null;
 
 /**
  * Hardened WebPreferences for the chrome UI. Context isolation is on, node
@@ -60,7 +62,17 @@ function createMainWindow(): BrowserWindow {
   void win.loadFile(rendererHtml);
 
   const manager = new TabManager();
-  controller = new BrowserController({ window: win, manager });
+  controller = new BrowserController({
+    window: win,
+    manager,
+    onBookmarkPage: (url, title) => {
+      bookmarks?.openAddDialogForPage(url, title);
+    },
+    onToggleBookmarksBar: () => {
+      bookmarks?.toggleToolbar();
+    },
+    bookmarksBarVisible: () => bookmarks?.isToolbarVisible() ?? false,
+  });
   controller.init();
 
   settingsStore ??= new ShieldSettingsStore(
@@ -72,6 +84,16 @@ function createMainWindow(): BrowserWindow {
     settingsStore,
   });
   shield.attachManager(manager);
+
+  bookmarks ??= new BookmarkCoordinator({
+    chrome: win.webContents,
+    collectionFile: path.join(app.getPath('userData'), 'bookmarks.json'),
+    prefsFile: path.join(app.getPath('userData'), 'bookmarks-ui.json'),
+    onLayoutChanged: () => {
+      controller?.relayout();
+    },
+  });
+  bookmarks.attachManager(manager);
 
   // Tear down tab views while the window is still valid ('close' fires before
   // destruction). dispose() is idempotent, so the 'closed' fallback stays safe.
@@ -97,8 +119,10 @@ void app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
-  // Flush any debounced Shield settings write so saved preferences survive.
+  // Flush any debounced Shield settings and bookmark writes so saved data
+  // survives.
   settingsStore?.flush();
+  bookmarks?.dispose();
 });
 
 app.on('window-all-closed', () => {

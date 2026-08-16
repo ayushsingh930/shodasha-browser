@@ -42,6 +42,18 @@ const IPC = {
   shieldGetAllowlist: 'shield:get-allowlist',
   shieldAddAllowlist: 'shield:add-allowlist',
   shieldRemoveAllowlist: 'shield:remove-allowlist',
+  bookmarkGetState: 'bookmarks:get-state',
+  bookmarkStateChanged: 'bookmarks:state-changed',
+  bookmarkAdd: 'bookmarks:add',
+  bookmarkUpdate: 'bookmarks:update',
+  bookmarkDelete: 'bookmarks:delete',
+  bookmarkCreateFolder: 'bookmarks:create-folder',
+  bookmarkRenameFolder: 'bookmarks:rename-folder',
+  bookmarkDeleteFolder: 'bookmarks:delete-folder',
+  bookmarkMove: 'bookmarks:move',
+  bookmarkSearch: 'bookmarks:search',
+  bookmarkSetToolbarVisible: 'bookmarks:set-toolbar-visible',
+  bookmarkOpenAddDialog: 'bookmarks:open-add-dialog',
 };
 
 function subscribe(channel, callback) {
@@ -97,5 +109,22 @@ contextBridge.exposeInMainWorld('shodasha', {
     addToAllowlist: (site) => ipcRenderer.invoke(IPC.shieldAddAllowlist, site),
     removeFromAllowlist: (site) =>
       ipcRenderer.invoke(IPC.shieldRemoveAllowlist, site),
+  },
+  bookmarks: {
+    getState: () => ipcRenderer.invoke(IPC.bookmarkGetState),
+    add: (input) => ipcRenderer.invoke(IPC.bookmarkAdd, input),
+    update: (id, patch) => ipcRenderer.invoke(IPC.bookmarkUpdate, id, patch),
+    delete: (id) => ipcRenderer.invoke(IPC.bookmarkDelete, id),
+    createFolder: (name) => ipcRenderer.invoke(IPC.bookmarkCreateFolder, name),
+    renameFolder: (id, name) =>
+      ipcRenderer.invoke(IPC.bookmarkRenameFolder, id, name),
+    deleteFolder: (id) => ipcRenderer.invoke(IPC.bookmarkDeleteFolder, id),
+    move: (id, folderId) => ipcRenderer.invoke(IPC.bookmarkMove, id, folderId),
+    search: (query) => ipcRenderer.invoke(IPC.bookmarkSearch, query),
+    setToolbarVisible: (visible) =>
+      ipcRenderer.invoke(IPC.bookmarkSetToolbarVisible, visible),
+    onStateChanged: (callback) => subscribe(IPC.bookmarkStateChanged, callback),
+    onOpenAddDialog: (callback) =>
+      subscribe(IPC.bookmarkOpenAddDialog, callback),
   },
 });
