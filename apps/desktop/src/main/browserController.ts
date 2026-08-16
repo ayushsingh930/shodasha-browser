@@ -33,6 +33,10 @@ import {
   type ShortcutInput,
 } from '../shared/shortcuts.js';
 import { buildErrorPage } from './errorPage.js';
+import {
+  destroyViewSafely,
+  handleViewDestroyed,
+} from './viewLifecycle.js';
 
 /** Height reserved for the chrome (toolbar + tab bar). */
 export const CHROME_HEIGHT = 88;
@@ -50,6 +54,13 @@ export interface BrowserControllerOptions {
 interface LiveTab {
   readonly id: string;
   readonly view: WebContentsView;
+  /**
+   * Cached webContents reference. Safe to call `isDestroyed()` on forever,
+   * even after the view/webContents pair is gone.
+   */
+  readonly wc: WebContents;
+  /** Whether the view is attached to the window's content view. */
+  attached: boolean;
   /** The last URL we explicitly navigated to (for error-page context). */
   lastRequestedUrl: string;
 }
@@ -63,6 +74,7 @@ export class BrowserController {
   private readonly chrome: WebContents;
   private readonly session: Session;
   private unsub: (() => void) | null = null;
+  private disposed = false;
 
   public constructor(options: BrowserControllerOptions) {
     this.window = options.window;
@@ -93,9 +105,14 @@ export class BrowserController {
 
   /** Releases all resources (views, listeners). Called on window close. */
   public dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
     this.unsub?.();
+    this.unsub = null;
     for (const tab of this.liveTabs.values()) {
-      this.destroyView(tab);
+      destroyViewSafely(tab, this.window);
     }
     this.liveTabs.clear();
     this.manager.clear();
@@ -261,11 +278,11 @@ export class BrowserController {
 
   private reloadTab(id: string): void {
     const tab = this.liveTabs.get(id);
-    if (tab === undefined) {
+    if (tab === undefined || tab.wc.isDestroyed()) {
       return;
     }
     this.manager.setLoading(id, true);
-    tab.view.webContents.reload();
+    tab.wc.reload();
     this.pushState();
   }
 
@@ -334,11 +351,11 @@ export class BrowserController {
       return;
     }
     const tab = this.liveTabs.get(active.id);
-    if (tab === undefined) {
+    if (tab === undefined || tab.wc.isDestroyed()) {
       return;
     }
     this.manager.setLoading(active.id, true);
-    tab.view.webContents.reload();
+    tab.wc.reload();
     this.pushState();
   }
 
@@ -348,11 +365,11 @@ export class BrowserController {
       return;
     }
     const tab = this.liveTabs.get(active.id);
-    if (tab === undefined) {
+    if (tab === undefined || tab.wc.isDestroyed()) {
       return;
     }
     this.manager.setLoading(active.id, true);
-    tab.view.webContents.reloadIgnoringCache();
+    tab.wc.reloadIgnoringCache();
     this.pushState();
   }
 
@@ -362,10 +379,10 @@ export class BrowserController {
       return;
     }
     const tab = this.liveTabs.get(active.id);
-    if (tab === undefined) {
+    if (tab === undefined || tab.wc.isDestroyed()) {
       return;
     }
-    tab.view.webContents.stop();
+    tab.wc.stop();
     this.manager.setLoading(active.id, false);
     this.pushState();
   }
@@ -411,6 +428,9 @@ export class BrowserController {
   // ------------------------------------------------------------- views
 
   private ensureView(id: string): void {
+    if (this.disposed || this.window.isDestroyed()) {
+      return;
+    }
     if (this.liveTabs.has(id)) {
       return;
     }
@@ -427,6 +447,8 @@ export class BrowserController {
     const live: LiveTab = {
       id,
       view,
+      wc: view.webContents,
+      attached: true,
       lastRequestedUrl: '',
     };
     this.liveTabs.set(id, live);
@@ -440,7 +462,14 @@ export class BrowserController {
   }
 
   private wireView(live: LiveTab): void {
-    const wc = live.view.webContents;
+    const wc = live.wc;
+
+    // If the webContents is destroyed externally (renderer crash, window
+    // teardown), drop the stale reference immediately so no later cleanup
+    // ever touches the destroyed object.
+    wc.once('destroyed', () => {
+      this.onViewDestroyed(live);
+    });
 
     // Browser shortcuts apply even while a page has keyboard focus. Only the
     // browser's own shortcuts are intercepted; everything else reaches the page.
@@ -521,6 +550,9 @@ export class BrowserController {
   }
 
   private loadInView(live: LiveTab, url: string, recordHistory = true): void {
+    if (live.wc.isDestroyed()) {
+      return;
+    }
     if (!isAllowedNavigationUrl(url)) {
       this.showErrorPage(
         live,
@@ -537,7 +569,7 @@ export class BrowserController {
       this.manager.setUrl(live.id, url);
       this.manager.setLoading(live.id, true);
     }
-    void live.view.webContents.loadURL(url).catch(() => {
+    void live.wc.loadURL(url).catch(() => {
       // did-fail-load will surface the user-facing error; swallow here.
     });
     this.relayout();
@@ -548,9 +580,12 @@ export class BrowserController {
     error: NavigationError,
     url: string,
   ): void {
+    if (live.wc.isDestroyed()) {
+      return;
+    }
     this.manager.endNavigation(live.id, 'error', error.message);
     const errorUrl = buildErrorPage(error, url);
-    void live.view.webContents.loadURL(errorUrl).catch(() => {
+    void live.wc.loadURL(errorUrl).catch(() => {
       // The error page itself failing is not user-visible; ignore.
     });
     this.relayout();
@@ -561,14 +596,24 @@ export class BrowserController {
     if (live === undefined) {
       return;
     }
-    this.destroyView(live);
+    destroyViewSafely(live, this.window);
     this.liveTabs.delete(id);
   }
 
-  private destroyView(live: LiveTab): void {
-    // Remove from the window and close to free the renderer process.
-    this.window.contentView.removeChildView(live.view);
-    live.view.webContents.close({ waitForBeforeUnload: false });
+  /**
+   * Called when a tab's webContents is destroyed externally. Removes the
+   * stale reference so later cleanup never touches the destroyed object.
+   * Never destroys anything itself, so it cannot recurse.
+   */
+  private onViewDestroyed(live: LiveTab): void {
+    if (this.disposed) {
+      return;
+    }
+    const removed = handleViewDestroyed(live.id, this.liveTabs);
+    if (removed !== null) {
+      this.relayout();
+      this.pushState();
+    }
   }
 
   // --------------------------------------------------------- layout
@@ -579,6 +624,10 @@ export class BrowserController {
       return;
     }
     for (const live of this.liveTabs.values()) {
+      // A view whose webContents died externally must never be touched.
+      if (live.wc.isDestroyed()) {
+        continue;
+      }
       const tab = this.manager.getTab(live.id);
       if (tab === null) {
         live.view.setVisible(false);

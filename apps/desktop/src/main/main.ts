@@ -67,8 +67,12 @@ function createMainWindow(): BrowserWindow {
   });
   shield.attachManager(manager);
 
-  win.on('closed', () => {
+  // Tear down tab views while the window is still valid ('close' fires before
+  // destruction). dispose() is idempotent, so the 'closed' fallback stays safe.
+  win.on('close', () => {
     controller?.dispose();
+  });
+  win.on('closed', () => {
     controller = null;
   });
 
