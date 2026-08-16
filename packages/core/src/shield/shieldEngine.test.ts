@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { DEMO_FILTER_RULES, demoFilterList } from './lists/demoFilterList.js';
 import { InMemoryFilterListSource } from './lists/filterListSource.js';
 import { categoriesForMode, ShieldEngine } from './shieldEngine.js';
-import type { BlockRule } from './types/rule.js';
+import type { BlockRule, FilterRule } from './types/rule.js';
 import type { ShieldRequest } from './types/request.js';
 
 function rule(
@@ -32,6 +33,17 @@ function request(url: string, extra: Partial<ShieldRequest> = {}): ShieldRequest
 const ADS = [rule('ad-doubleclick', 'doubleclick.net')];
 const TRACKERS = [rule('trk-analytics', 'analytics.example.com', 'trackers')];
 const OTHER = [rule('other-custom', 'custom.example.org', 'other')];
+
+function scopedRule(id: string, value: string, scope: Partial<FilterRule>): FilterRule {
+  return { id, kind: 'domain', category: 'ads', value, source: 'test', ...scope };
+}
+
+function firstPartyRequest(url: string, extra: Partial<ShieldRequest> = {}): ShieldRequest {
+  return request(url, {
+    firstPartyOrigin: 'https://example.com',
+    ...extra,
+  });
+}
 
 describe('categoriesForMode', () => {
   it('standard mode blocks core categories but not other', () => {
@@ -254,10 +266,253 @@ describe('ShieldEngine matching edge cases', () => {
     expect(engine.evaluate(request('http://localhost/x')).kind).toBe('block');
   });
 
+  it('matches a trailing-dot request against a plain rule', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    expect(engine.evaluate(request('https://doubleclick.net./x')).kind).toBe('block');
+  });
+
+  it('never treats evil-example.com as example.com', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    expect(engine.evaluate(request('https://evil-example.com/x')).kind).toBe('allow');
+    expect(engine.evaluate(request('https://example.com.evil.com/x')).kind).toBe(
+      'allow',
+    );
+  });
+
+  it('never allowlists example.com.evil.com for an example.com entry', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    engine.addAllowlist('example.com');
+    expect(engine.isAllowlisted('example.com.evil.com')).toBe(false);
+    expect(engine.isAllowlisted('evil-example.com')).toBe(false);
+    expect(engine.isAllowlisted('sub.example.com')).toBe(true);
+  });
+
   it('handles a malformed request URL hostname gracefully', () => {
     const engine = new ShieldEngine();
     engine.addRules(ADS);
     expect(() => engine.evaluate(request('https://doubleclick.net/x'))).not.toThrow();
+  });
+
+  it('treats an IPv6 request hostname as unmatchable (fail-open)', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    const decision = engine.evaluate({ ...request('https://example.com'), hostname: '[::1]' });
+    expect(decision.kind).toBe('allow');
+    expect(engine.stats.requestsAllowed).toBe(1);
+  });
+});
+
+describe('ShieldEngine rule scoping', () => {
+  it('applies a resource-type-scoped rule only to that type', () => {
+    const engine = new ShieldEngine();
+    engine.addRules([scopedRule('r-script', 'ads.example.com', { resourceTypes: ['script'] })]);
+    expect(
+      engine.evaluate(firstPartyRequest('https://ads.example.com/a.js', { resourceType: 'script' })).kind,
+    ).toBe('block');
+    expect(
+      engine.evaluate(firstPartyRequest('https://ads.example.com/a.png', { resourceType: 'image' })).kind,
+    ).toBe('allow');
+  });
+
+  it('applies a third-party-scoped rule only to third-party requests', () => {
+    const engine = new ShieldEngine();
+    engine.addRules([scopedRule('r-tp', 'ads.example.net', { party: 'third-party' })]);
+    expect(
+      engine.evaluate(firstPartyRequest('https://ads.example.net/x')).kind,
+    ).toBe('block');
+    expect(
+      engine.evaluate(request('https://ads.example.net/x', { firstPartyOrigin: null })).kind,
+    ).toBe('allow');
+  });
+
+  it('applies a first-party-scoped rule only to first-party requests', () => {
+    const engine = new ShieldEngine();
+    engine.addRules([
+      scopedRule('r-fp', 'cdn.example.com', { party: 'first-party' }),
+    ]);
+    expect(
+      engine.evaluate(firstPartyRequest('https://cdn.example.com/lib.js')).kind,
+    ).toBe('block');
+    expect(
+      engine.evaluate(
+        request('https://cdn.example.com/lib.js', { firstPartyOrigin: 'https://other.org' }),
+      ).kind,
+    ).toBe('allow');
+  });
+});
+
+describe('ShieldEngine allow rules', () => {
+  it('an explicit allow rule beats a matching block rule', () => {
+    const engine = new ShieldEngine();
+    engine.addRules([
+      rule('block-ads', 'ads.example.com'),
+      scopedRule('allow-ads', 'ads.example.com', { action: 'allow' }),
+    ]);
+    const decision = engine.evaluate(request('https://ads.example.com/x'));
+    expect(decision.kind).toBe('allow-rule');
+    expect(decision.matchedRules.map((r) => r.id)).toEqual(['allow-ads']);
+    expect(engine.stats.requestsBlocked).toBe(0);
+    expect(engine.stats.requestsAllowed).toBe(1);
+  });
+
+  it('a subdomain allow rule overrides a parent block rule', () => {
+    const engine = new ShieldEngine();
+    engine.addRules([
+      rule('block-parent', 'example.com'),
+      scopedRule('allow-sub', 'cdn.example.com', { action: 'allow' }),
+    ]);
+    expect(engine.evaluate(request('https://example.com/x')).kind).toBe('block');
+    expect(engine.evaluate(request('https://cdn.example.com/x')).kind).toBe('allow-rule');
+  });
+
+  it('allowlist still outranks allow rules and block rules', () => {
+    const engine = new ShieldEngine();
+    engine.addRules([
+      rule('block-ads', 'ads.example.com'),
+      scopedRule('allow-ads', 'ads.example.com', { action: 'allow' }),
+    ]);
+    engine.addAllowlist('ads.example.com');
+    expect(engine.evaluate(request('https://ads.example.com/x')).kind).toBe('allowlisted');
+  });
+});
+
+describe('ShieldEngine decision cache', () => {
+  it('serves consistent decisions across repeated evaluations', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    const first = engine.evaluate(request('https://doubleclick.net/x'));
+    const second = engine.evaluate(request('https://doubleclick.net/x'));
+    expect(first).toEqual(second);
+    expect(engine.stats.requestsEvaluated).toBe(2);
+  });
+
+  it('invalidates cached decisions when rules change', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    expect(engine.evaluate(request('https://doubleclick.net/x')).kind).toBe('block');
+    engine.addRules([
+      scopedRule('allow-ads', 'doubleclick.net', { action: 'allow' }),
+    ]);
+    expect(engine.evaluate(request('https://doubleclick.net/x')).kind).toBe('allow-rule');
+  });
+
+  it('invalidates cached decisions when the shield is disabled', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    expect(engine.evaluate(request('https://doubleclick.net/x')).kind).toBe('block');
+    engine.setEnabled(false);
+    expect(engine.evaluate(request('https://doubleclick.net/x')).kind).toBe('allow');
+  });
+
+  it('invalidates cached decisions when the mode changes', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(OTHER);
+    expect(engine.evaluate(request('https://custom.example.org/x')).kind).toBe('allow');
+    engine.setMode('strict');
+    expect(engine.evaluate(request('https://custom.example.org/x')).kind).toBe('block');
+  });
+
+  it('invalidates cached decisions when the allowlist changes', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    expect(engine.evaluate(request('https://doubleclick.net/x')).kind).toBe('block');
+    engine.addAllowlist('doubleclick.net');
+    expect(engine.evaluate(request('https://doubleclick.net/x')).kind).toBe('allowlisted');
+    engine.removeAllowlist('doubleclick.net');
+    expect(engine.evaluate(request('https://doubleclick.net/x')).kind).toBe('block');
+  });
+
+  it('invalidates cached decisions when a site setting changes', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    engine.setSiteSetting('example.com', { enabled: false });
+    expect(
+      engine.evaluate(request('https://doubleclick.net/x'), { currentSite: 'example.com' }).kind,
+    ).toBe('allow');
+    engine.setSiteSetting('example.com', { enabled: true });
+    expect(
+      engine.evaluate(request('https://doubleclick.net/x'), { currentSite: 'example.com' }).kind,
+    ).toBe('block');
+  });
+});
+
+describe('ShieldEngine recent events', () => {
+  it('records block and allow-rule events, never plain allows', () => {
+    const engine = new ShieldEngine();
+    engine.addRules([
+      rule('block-ads', 'ads.example.com'),
+      scopedRule('allow-cdn', 'cdn.example.com', { action: 'allow' }),
+    ]);
+    engine.evaluate(request('https://ads.example.com/x'));
+    engine.evaluate(request('https://cdn.example.com/x'));
+    engine.evaluate(request('https://example.com/clean'));
+    const events = engine.recentEvents;
+    expect(events).toHaveLength(2);
+    const newest = events[0];
+    const oldest = events[1];
+    expect(newest?.hostname).toBe('cdn.example.com');
+    expect(newest?.action).toBe('allow');
+    expect(oldest?.hostname).toBe('ads.example.com');
+    expect(oldest?.action).toBe('block');
+    expect(oldest?.category).toBe('ads');
+    expect(oldest?.resourceType).toBe('xhr');
+  });
+
+  it('can be cleared', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    engine.evaluate(request('https://doubleclick.net/x'));
+    expect(engine.recentEvents).toHaveLength(1);
+    engine.clearEvents();
+    expect(engine.recentEvents).toHaveLength(0);
+  });
+});
+
+describe('ShieldEngine per-site statistics', () => {
+  it('tracks evaluated/blocked/allowed for the current site', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    engine.evaluate(request('https://doubleclick.net/x'), { currentSite: 'example.com' });
+    engine.evaluate(request('https://example.com/ok'), { currentSite: 'example.com' });
+    engine.evaluate(request('https://doubleclick.net/y'), { currentSite: 'other.org' });
+    expect(engine.siteStatsFor('example.com').requestsEvaluated).toBe(2);
+    expect(engine.siteStatsFor('example.com').requestsBlocked).toBe(1);
+    expect(engine.siteStatsFor('example.com').requestsAllowed).toBe(1);
+    expect(engine.siteStatsFor('other.org').requestsBlocked).toBe(1);
+    expect(engine.siteStatsFor('unvisited.net').requestsEvaluated).toBe(0);
+  });
+
+  it('resetStats clears per-site counters', () => {
+    const engine = new ShieldEngine();
+    engine.addRules(ADS);
+    engine.evaluate(request('https://doubleclick.net/x'), { currentSite: 'example.com' });
+    engine.resetStats();
+    expect(engine.siteStatsFor('example.com').requestsEvaluated).toBe(0);
+  });
+});
+
+describe('ShieldEngine demo list', () => {
+  it('loads the demo test list and blocks its test domains', () => {
+    const engine = new ShieldEngine();
+    const accepted = engine.addList(demoFilterList);
+    expect(accepted).toBe(DEMO_FILTER_RULES.length);
+    expect(engine.evaluate(request('https://ads.test/px.gif', { resourceType: 'image' })).kind).toBe(
+      'block',
+    );
+    expect(engine.evaluate(request('https://tracker.test/t.js', { resourceType: 'script' })).kind).toBe(
+      'block',
+    );
+    expect(engine.evaluate(request('https://analytics.test/a.gif', { resourceType: 'image' })).kind).toBe(
+      'block',
+    );
+    expect(engine.evaluate(request('https://example.com/ok')).kind).toBe('allow');
+  });
+
+  it('does not claim demo domains are real ad networks (documented test-only)', () => {
+    expect(demoFilterList.provenance).toContain('test');
   });
 });
 
@@ -269,6 +524,9 @@ describe('ShieldEngine blocklists', () => {
         id: 'test-ads',
         name: 'Test Ads',
         version: '1.0.0',
+        license: 'MIT',
+        updatedAt: '2026-08-16',
+        provenance: 'test fixture',
         rules: ADS,
       }),
     );

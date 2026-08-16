@@ -6,17 +6,24 @@ SHODASHA is a privacy-first web browser under development. It aims to deliver
 user-controlled content filtering, strong security, modern browser features,
 and — eventually — an Android release suitable for Google Play distribution.
 
-This repository currently contains the **foundation build**: a clean, modular,
-strictly-typed TypeScript project that establishes the architecture before any
-browser features are implemented.
+This repository contains the **foundation build**: a clean, modular,
+strictly-typed TypeScript project that establishes the architecture, plus a
+working request filter (SHODASHA Shield) wired into the desktop browser.
 
 ## Status
 
 - ✅ Project foundation (workspace, core library, desktop shell, tooling, tests)
-- ⏳ Content filtering engine (interface defined, implementation pending)
+- ✅ SHODASHA Shield — rule-based ad/tracker request filtering (modes,
+      per-site control, allowlist, statistics, recent activity)
 - ⏳ Tab management
 - ⏳ Password manager
 - ⏳ Android / Play Store packaging
+
+The Shield filters requests at the network layer via deterministic rules and
+never claims to block every ad or tracker — it only blocks what a validated
+rule matches. The bundled demo list covers reserved `.test` domains to prove
+the pipeline; real lists must be imported with their license metadata. See
+[PRIVACY.md](./PRIVACY.md) for the full behavior.
 
 See [DEVELOPMENT.md](./DEVELOPMENT.md) for the roadmap and
 [ARCHITECTURE.md](./ARCHITECTURE.md) for the design.
@@ -46,6 +53,8 @@ npm run dev          # builds and launches the desktop shell (Electron)
 ├── packages/core/          Platform-agnostic browser logic (pure TypeScript)
 │   ├── src/url/            URL privacy utilities
 │   ├── src/privacy/        Content-filtering contracts & engine
+│   ├── src/shield/         SHODASHA Shield: rule engine, allowlist, modes,
+│   │                       stats & events (host-agnostic)
 │   ├── src/security/       Secret handling & redaction
 │   ├── src/storage/        Storage abstraction interfaces
 │   └── src/logging/        Privacy-safe structured logger

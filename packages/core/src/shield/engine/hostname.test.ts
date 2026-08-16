@@ -12,6 +12,15 @@ describe('normalizeHostname', () => {
   it('lowercases and trims', () => {
     expect(normalizeHostname('  Example.COM  ')).toBe('example.com');
   });
+
+  it('strips a single trailing dot (DNS treats it as the same name)', () => {
+    expect(normalizeHostname('example.com.')).toBe('example.com');
+    expect(normalizeHostname('WWW.EXAMPLE.COM.')).toBe('www.example.com');
+  });
+
+  it('keeps a lone dot intact', () => {
+    expect(normalizeHostname('.')).toBe('.');
+  });
 });
 
 describe('isValidHostname', () => {
@@ -82,6 +91,16 @@ describe('isValidHostname', () => {
   it('rejects an empty string', () => {
     expect(isValidHostname('')).toBe(false);
   });
+
+  it('rejects IPv6 literals in rule values (fail-open, never mis-matched)', () => {
+    expect(isValidHostname('::1')).toBe(false);
+    expect(isValidHostname('[::1]')).toBe(false);
+    expect(isValidHostname('2001:db8::1')).toBe(false);
+  });
+
+  it('rejects IPv4 with a port', () => {
+    expect(isValidHostname('127.0.0.1:8080')).toBe(false);
+  });
 });
 
 describe('parentDomains', () => {
@@ -112,12 +131,31 @@ describe('hostnameFromUrl', () => {
     expect(hostnameFromUrl('https://user:pass@example.com/')).toBe('example.com');
   });
 
+  it('handles an IPv4 literal with a port', () => {
+    expect(hostnameFromUrl('http://127.0.0.1:8080/x')).toBe('127.0.0.1');
+  });
+
+  it('handles an IPv6 literal hostname (never mis-parsed)', () => {
+    expect(hostnameFromUrl('http://[::1]:8080/x')).toBe('[::1]');
+  });
+
+  it('handles localhost', () => {
+    expect(hostnameFromUrl('http://localhost:3000/x')).toBe('localhost');
+  });
+
+  it('normalizes a trailing-dot hostname', () => {
+    expect(hostnameFromUrl('https://example.com./x')).toBe('example.com');
+  });
+
   it('returns null for an unparseable URL', () => {
     expect(hostnameFromUrl('not a url')).toBeNull();
+    expect(hostnameFromUrl('example.com')).toBeNull();
   });
 
   it('returns null for a scheme without a host', () => {
     expect(hostnameFromUrl('about:blank')).toBeNull();
+    expect(hostnameFromUrl('http://')).toBeNull();
+    expect(hostnameFromUrl('https://')).toBeNull();
   });
 });
 

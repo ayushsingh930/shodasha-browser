@@ -63,7 +63,7 @@ export {
 export type {
   FilterCategory,
   FilterDirection,
-  FilterRule,
+  ContentFilterRule,
   FilterList,
   FilterDecision,
   ContentFilterEngine,
@@ -86,6 +86,9 @@ export {
   emptyShieldStats,
   InMemoryFilterListSource,
   parseRuleLines,
+  demoFilterList,
+  DEMO_FILTER_RULES,
+  RecentEventsBuffer,
 } from './shield/index.js';
 export type {
   ShieldRequest,
@@ -96,12 +99,17 @@ export type {
   ShieldMode,
   ShieldDecision,
   ShieldDecisionKind,
+  FilterRule,
+  FilterRuleKind,
+  FilterRuleAction,
   BlockRule,
   BlockRuleKind,
   SiteShieldSetting,
   ShieldStats,
+  SiteStats,
   FilterListSource,
   ParseBlocklistOptions,
+  ShieldFilterEvent,
 } from './shield/index.js';
 
 export {

@@ -103,6 +103,9 @@ const siteSettingsCurrent = document.querySelector<HTMLElement>('#site-settings-
 const siteSettingsShield = document.querySelector<HTMLButtonElement>('#site-settings-shield');
 const siteSettingsMode = document.querySelector<HTMLSelectElement>('#site-settings-mode');
 const siteSettingsAllowlist = document.querySelector<HTMLButtonElement>('#site-settings-allowlist');
+const shieldSiteStats = document.querySelector<HTMLElement>('#shield-site-stats');
+const shieldRecent = document.querySelector<HTMLElement>('#shield-recent');
+const shieldRecentList = document.querySelector<HTMLUListElement>('#shield-recent-list');
 
 // ----------------------------------------------------------------------
 // State
@@ -594,6 +597,8 @@ function applyShieldState(state: ShieldPanelState): void {
   setText(shieldStatFiltered, state.stats.requestsBlocked);
   setText(shieldStatTrackers, state.stats.trackersBlocked);
   setText(shieldStatAds, state.stats.adsFiltered);
+  renderShieldSiteStats(state);
+  renderShieldRecent(state);
   if (shieldMode !== null) {
     shieldMode.value = state.mode;
   }
@@ -606,6 +611,45 @@ function applyShieldState(state: ShieldPanelState): void {
     shieldSiteSettingsButton.disabled = state.currentSite === null;
   }
   renderSiteSettings(state);
+}
+
+function renderShieldSiteStats(state: ShieldPanelState): void {
+  const stats = state.siteStats;
+  if (stats === null) {
+    setText(shieldSiteStats, '\u2014');
+    return;
+  }
+  setText(
+    shieldSiteStats,
+    `${String(stats.requestsEvaluated)} evaluated \u00b7 ${String(stats.requestsBlocked)} filtered`,
+  );
+}
+
+function renderShieldRecent(state: ShieldPanelState): void {
+  if (shieldRecent === null || shieldRecentList === null) {
+    return;
+  }
+  const events = state.recentEvents;
+  if (events.length === 0) {
+    shieldRecent.hidden = true;
+    shieldRecentList.replaceChildren();
+    return;
+  }
+  shieldRecent.hidden = false;
+  const fragment = document.createDocumentFragment();
+  for (const event of events) {
+    const item = document.createElement('li');
+    item.className = `shield-event shield-event-${event.action}`;
+    const label = document.createElement('span');
+    label.className = 'shield-event-label';
+    label.textContent = event.action === 'block' ? 'Blocked' : 'Allowed';
+    const detail = document.createElement('span');
+    detail.className = 'shield-event-detail';
+    detail.textContent = `${event.category} \u00b7 ${event.resourceType} \u00b7 ${event.hostname}`;
+    item.append(label, detail);
+    fragment.append(item);
+  }
+  shieldRecentList.replaceChildren(fragment);
 }
 
 function renderSiteSettings(state: ShieldPanelState): void {

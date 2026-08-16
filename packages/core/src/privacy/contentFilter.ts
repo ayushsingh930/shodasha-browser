@@ -15,7 +15,7 @@ export type FilterCategory =
 export type FilterDirection = 'request' | 'document';
 
 /** A single parsed content-filter rule. */
-export interface FilterRule {
+export interface ContentFilterRule {
   /** The category this rule belongs to. */
   readonly category: FilterCategory;
   /** Direction the rule applies to. */
@@ -38,7 +38,7 @@ export interface FilterList {
   /** Version string of the list contents. */
   readonly version: string;
   /** The rules in this list. */
-  readonly rules: readonly FilterRule[];
+  readonly rules: readonly ContentFilterRule[];
 }
 
 /**
@@ -48,7 +48,7 @@ export interface FilterDecision {
   /** Whether any rule matched. */
   readonly blocked: boolean;
   /** The rule(s) that caused the match, if any. */
-  readonly matchedBy: readonly FilterRule[];
+  readonly matchedBy: readonly ContentFilterRule[];
 }
 
 /**

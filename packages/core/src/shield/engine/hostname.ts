@@ -7,9 +7,17 @@
  * are rejected in rule/allowlist values.
  */
 
-/** Normalizes a hostname for comparison (trim + lowercase). */
+/**
+ * Normalizes a hostname for comparison (trim + lowercase + single trailing
+ * dot stripped, since DNS treats `example.com.` and `example.com` as the same
+ * name). Stripping the trailing dot keeps rule, allowlist, and request
+ * hostnames on the same footing so they can never diverge.
+ */
 export function normalizeHostname(value: string): string {
-  return value.trim().toLowerCase();
+  const trimmed = value.trim().toLowerCase();
+  return trimmed.endsWith('.') && trimmed.length > 1
+    ? trimmed.slice(0, -1)
+    : trimmed;
 }
 
 /**

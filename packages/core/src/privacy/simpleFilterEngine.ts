@@ -9,14 +9,14 @@
 
 import type {
   ContentFilterEngine,
+  ContentFilterRule,
   FilterDecision,
   FilterList,
-  FilterRule,
 } from './contentFilter.js';
 
 /** A rule that has been normalized for fast matching. */
 interface CompiledRule {
-  readonly rule: FilterRule;
+  readonly rule: ContentFilterRule;
   readonly normalizedPattern: string;
 }
 
@@ -45,7 +45,7 @@ export class SimpleFilterEngine implements ContentFilterEngine {
 
   public shouldBlockRequest(subject: string): FilterDecision {
     const normalized = subject.toLowerCase();
-    const matchedBy: FilterRule[] = [];
+    const matchedBy: ContentFilterRule[] = [];
 
     for (const entry of this.compiled) {
       if (normalized.includes(entry.normalizedPattern)) {

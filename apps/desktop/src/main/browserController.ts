@@ -340,7 +340,9 @@ export class BrowserController {
     }
     const tab = this.liveTabs.get(active.id);
     if (tab !== undefined) {
-      this.loadInView(tab, target);
+      // The model already moved to the target entry; loading must not push a
+      // new history entry (that would truncate the forward history).
+      this.loadInView(tab, target, false);
     }
     this.pushState();
   }

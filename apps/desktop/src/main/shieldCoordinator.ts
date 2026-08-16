@@ -20,6 +20,7 @@
 import { ipcMain, type Session, type WebContents } from 'electron';
 import {
   ShieldEngine,
+  demoFilterList,
   hostnameFromUrl,
   isValidHostname,
   normalizeHostname,
@@ -59,6 +60,9 @@ const ELECTRON_RESOURCE_TYPES: Record<string, ResourceType> = {
 /** Panel pushes are throttled to avoid unnecessary IPC during traffic. */
 const PANEL_PUSH_THROTTLE_MS = 500;
 
+/** The number of recent events shown in the panel (privacy-safe metadata). */
+const MAX_RECENT_EVENTS_SHOWN = 8;
+
 let requestCounter = 0;
 
 export class ShieldCoordinator {
@@ -75,6 +79,10 @@ export class ShieldCoordinator {
     this.chrome = options.chrome;
     this.installIpcHandlers();
     this.installRequestFilter();
+    // Ship the deterministic local test list (reserved .test domains only).
+    // Real lists are imported separately with their license documented; the
+    // Shield never bundles unverified third-party content.
+    this.engine.addList(demoFilterList);
   }
 
   /**
@@ -237,6 +245,8 @@ export class ShieldCoordinator {
       siteMode:
         site === null ? this.engine.mode : this.engine.getSiteSetting(site).mode,
       siteAllowlisted: site === null ? false : this.engine.isAllowlisted(site),
+      siteStats: site === null ? null : this.engine.siteStatsFor(site),
+      recentEvents: this.engine.recentEvents.slice(0, MAX_RECENT_EVENTS_SHOWN),
     };
   }
 

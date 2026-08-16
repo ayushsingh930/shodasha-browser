@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BlockRule } from '../types/rule.js';
+import type { BlockRule, FilterRule } from '../types/rule.js';
 import { RuleEngine } from './ruleMatcher.js';
 
 function domainRule(id: string, value: string, category: string = 'ads'): BlockRule {
@@ -10,6 +10,14 @@ function domainRule(id: string, value: string, category: string = 'ads'): BlockR
     value,
     source: 'test',
   };
+}
+
+function scopedRule(
+  id: string,
+  value: string,
+  scope: Partial<FilterRule>,
+): FilterRule {
+  return { id, kind: 'domain', category: 'ads', value, source: 'test', ...scope };
 }
 
 function hostnameRule(id: string, value: string, category: string = 'ads'): BlockRule {
@@ -119,5 +127,84 @@ describe('RuleEngine', () => {
   it('matches localhost rules', () => {
     const engine = new RuleEngine([domainRule('r1', 'localhost')]);
     expect(engine.evaluate('localhost', ALL)).toHaveLength(1);
+  });
+
+  it('matches a resource-type-scoped rule only for that type', () => {
+    const engine = new RuleEngine([
+      scopedRule('r1', 'ads.example.com', { resourceTypes: ['script'] }),
+    ]);
+    expect(
+      engine.evaluate('ads.example.com', ALL, { resourceType: 'script', party: undefined }),
+    ).toHaveLength(1);
+    expect(
+      engine.evaluate('ads.example.com', ALL, { resourceType: 'image', party: undefined }),
+    ).toHaveLength(0);
+    expect(
+      engine.evaluate('ads.example.com', ALL, { resourceType: undefined, party: undefined }),
+    ).toHaveLength(0);
+  });
+
+  it('matches a party-scoped rule only for that party', () => {
+    const engine = new RuleEngine([
+      scopedRule('r1', 'ads.example.com', { party: 'third-party' }),
+    ]);
+    expect(
+      engine.evaluate('ads.example.com', ALL, {
+        resourceType: 'image',
+        party: 'third-party',
+      }),
+    ).toHaveLength(1);
+    expect(
+      engine.evaluate('ads.example.com', ALL, {
+        resourceType: 'image',
+        party: 'first-party',
+      }),
+    ).toHaveLength(0);
+  });
+
+  it('never matches a party-scoped rule when the party is unknown', () => {
+    const engine = new RuleEngine([
+      scopedRule('r1', 'ads.example.com', { party: 'third-party' }),
+      scopedRule('r2', 'cdn.example.com', { party: 'first-party' }),
+    ]);
+    expect(
+      engine.evaluate('ads.example.com', ALL, { resourceType: 'image', party: undefined }),
+    ).toHaveLength(0);
+    expect(
+      engine.evaluate('cdn.example.com', ALL, { resourceType: 'image', party: undefined }),
+    ).toHaveLength(0);
+  });
+
+  it('skips disabled rules', () => {
+    const engine = new RuleEngine([
+      scopedRule('r1', 'ads.example.com', { enabled: false }),
+      domainRule('r2', 'track.example.com'),
+    ]);
+    expect(engine.evaluate('ads.example.com', ALL)).toHaveLength(0);
+    expect(engine.evaluate('track.example.com', ALL)).toHaveLength(1);
+  });
+
+  it('keeps allow and block rules distinct in results', () => {
+    const engine = new RuleEngine([
+      scopedRule('allow-r1', 'ads.example.com', { action: 'allow' }),
+      domainRule('block-r1', 'ads.example.com'),
+    ]);
+    const matched = engine.evaluate('ads.example.com', ALL);
+    expect(matched.map((r) => r.id)).toEqual(['allow-r1', 'block-r1']);
+  });
+
+  it('drops rules with an invalid resource-type scope', () => {
+    const engine = new RuleEngine([
+      scopedRule('bad', 'ads.example.com', { resourceTypes: ['bogus' as 'script'] }),
+      domainRule('good', 'track.example.com'),
+    ]);
+    expect(engine.ruleCount).toBe(1);
+  });
+
+  it('drops rules with an invalid party scope', () => {
+    const engine = new RuleEngine([
+      scopedRule('bad', 'ads.example.com', { party: 'sideways' as 'third-party' }),
+    ]);
+    expect(engine.ruleCount).toBe(0);
   });
 });

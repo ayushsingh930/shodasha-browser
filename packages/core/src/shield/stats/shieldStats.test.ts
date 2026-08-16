@@ -71,4 +71,38 @@ describe('ShieldStatsCounter', () => {
     expect(counter.snapshot.requestsEvaluated).toBe(1);
     expect(snapshot).toEqual(counter.snapshot);
   });
+
+  it('tracks per-site counters for the current site only', () => {
+    const counter = new ShieldStatsCounter();
+    counter.recordEvaluated('example.com');
+    counter.recordBlock([rule('ads')], 'example.com');
+    counter.recordAllowed('example.com');
+    counter.recordEvaluated('other-site.org');
+    expect(counter.snapshotForSite('example.com')).toEqual({
+      requestsEvaluated: 1,
+      requestsBlocked: 1,
+      requestsAllowed: 1,
+    });
+    expect(counter.snapshotForSite('other-site.org').requestsEvaluated).toBe(1);
+    expect(counter.snapshotForSite('unvisited.net')).toEqual({
+      requestsEvaluated: 0,
+      requestsBlocked: 0,
+      requestsAllowed: 0,
+    });
+  });
+
+  it('ignores site counters when no site is provided', () => {
+    const counter = new ShieldStatsCounter();
+    counter.recordEvaluated();
+    counter.recordAllowed();
+    expect(counter.snapshot.requestsEvaluated).toBe(1);
+    expect(counter.snapshotForSite('example.com').requestsEvaluated).toBe(0);
+  });
+
+  it('reset clears per-site counters too', () => {
+    const counter = new ShieldStatsCounter();
+    counter.recordEvaluated('example.com');
+    counter.reset();
+    expect(counter.snapshotForSite('example.com').requestsEvaluated).toBe(0);
+  });
 });

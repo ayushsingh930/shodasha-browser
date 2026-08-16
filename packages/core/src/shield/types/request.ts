@@ -19,8 +19,11 @@ export type ResourceType =
   | 'xhr'
   | 'other';
 
-/** Whether a request is same-site (first party) or cross-site (third party). */
-export type PartyContext = 'first-party' | 'third-party';
+/**
+ * Whether a request is same-site (first party), cross-site (third party), or
+ * undeterminable (`unknown-party` — never guessed).
+ */
+export type PartyContext = 'first-party' | 'third-party' | 'unknown-party';
 
 /** A single network request, as observed by the browser. */
 export interface ShieldRequest {

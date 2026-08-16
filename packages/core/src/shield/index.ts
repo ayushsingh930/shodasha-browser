@@ -28,7 +28,12 @@ export {
   ShieldStatsCounter,
   emptyShieldStats,
   type ShieldStats,
+  type SiteStats,
 } from './stats/shieldStats.js';
+export {
+  RecentEventsBuffer,
+  type ShieldFilterEvent,
+} from './stats/shieldEvents.js';
 
 export {
   InMemoryFilterListSource,
@@ -36,6 +41,7 @@ export {
 } from './lists/filterListSource.js';
 export { parseRuleLines } from './lists/parseBlocklist.js';
 export type { ParseBlocklistOptions } from './lists/parseBlocklist.js';
+export { demoFilterList, DEMO_FILTER_RULES } from './lists/demoFilterList.js';
 
 export type {
   ShieldRequest,
@@ -46,5 +52,11 @@ export type {
 export type { ShieldCategory } from './types/category.js';
 export type { ShieldMode } from './types/mode.js';
 export type { ShieldDecision, ShieldDecisionKind } from './types/decision.js';
-export type { BlockRule, BlockRuleKind } from './types/rule.js';
+export type {
+  FilterRule,
+  FilterRuleKind,
+  FilterRuleAction,
+  BlockRule,
+  BlockRuleKind,
+} from './types/rule.js';
 export type { SiteShieldSetting } from './types/state.js';

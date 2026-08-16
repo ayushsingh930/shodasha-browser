@@ -59,12 +59,27 @@ npm run dev --workspace=@shodasha/desktop
 
 ## Roadmap (in order)
 
-- [ ] Content filtering engine (implement + wire into desktop request pipeline)
+- [x] Content filtering engine (implement + wire into desktop request pipeline)
+- [x] SHODASHA Shield: rule-based request filtering (block/allow rules,
+      categories, modes, per-site control, allowlist, statistics)
 - [ ] Tab management
 - [ ] Password manager (with encrypted at-rest storage)
 - [ ] Settings & privacy controls UI
 - [ ] Android host (`apps/android`)
 - [ ] Play Store packaging
+
+## Working on the Shield
+
+- Core engine tests: `npm test --workspace=@shodasha/core` (the Shield has its
+  own unit tests plus a real-browser smoke test).
+- The desktop resolves `@shodasha/core` from its built `dist`; after core
+  changes, rebuild the core before type-checking or launching the desktop:
+  `npm run build --workspace=@shodasha/core`.
+- Rule model, decision model, and engine entry points live under
+  `packages/core/src/shield/`. Keep the decision pipeline deterministic and
+  fail-open; keep events and stats hostname-only.
+- When bundling filter lists, always record `license`, `updatedAt`, and
+  `provenance` — nothing may be bundled silently (see PRIVACY.md).
 
 The foundation is intentionally feature-free; each feature is added as a
 focused milestone and verified independently.

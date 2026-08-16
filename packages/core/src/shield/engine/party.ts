@@ -6,22 +6,26 @@
  * may be a CDN, an analytics beacon, a font, a payment provider, an auth
  * service, or a legitimate API. Filtering is always rule-based — never simply
  * "third-party = block".
+ *
+ * When the first-party origin is unknown the party relationship cannot be
+ * determined reliably, so the request is classified `unknown-party`. The
+ * engine never guesses: party-scoped rules simply do not apply to requests
+ * whose party cannot be established.
  */
 
 import { sameSite } from './hostname.js';
 
 /**
- * Classifies a request as first- or third-party. When the first-party origin
- * is unknown, the request is conservatively classified as third-party but is
- * never blocked for that reason alone.
+ * Classifies a request as first- or third-party. Returns `unknown-party` when
+ * the first-party origin is missing or unparseable.
  */
 export function classifyParty(request: {
   readonly hostname: string;
   readonly firstPartyOrigin: string | null;
-}): 'first-party' | 'third-party' {
+}): 'first-party' | 'third-party' | 'unknown-party' {
   const firstParty = firstPartyHostname(request.firstPartyOrigin);
   if (firstParty === null) {
-    return 'third-party';
+    return 'unknown-party';
   }
   return sameSite(request.hostname, firstParty) ? 'first-party' : 'third-party';
 }

@@ -6,7 +6,13 @@
  * the core tab model.
  */
 
-import type { SecurityState, ShieldMode, ShieldStats } from '@shodasha/core';
+import type {
+  SecurityState,
+  ShieldFilterEvent,
+  ShieldMode,
+  ShieldStats,
+  SiteStats,
+} from '@shodasha/core';
 
 /** A tab as presented to the UI. */
 export interface TabViewState {
@@ -47,6 +53,16 @@ export interface ShieldPanelState {
   readonly siteMode: ShieldMode;
   /** Whether the current site is allowlisted. */
   readonly siteAllowlisted: boolean;
+  /**
+   * Counters for the current site (session-scoped, in-memory only).
+   * `null` when there is no current site.
+   */
+  readonly siteStats: SiteStats | null;
+  /**
+   * The most recent rule-driven filter events for the current session,
+   * privacy-safe metadata only (no URLs, no query strings, no persistence).
+   */
+  readonly recentEvents: readonly ShieldFilterEvent[];
 }
 
 /** Whether a URL represents a blank new-tab page (nothing to show). */

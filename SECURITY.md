@@ -28,6 +28,36 @@ security controls.
 - **Content-Security-Policy** set on the renderer document.
 - **Preload bridge** exposes only a minimal, typed surface.
 
+## SHODASHA Shield — security posture
+
+- **Real cancellation, nothing weaker.** Filtering is enforced with Electron's
+  `webRequest` at the network layer. Certificate validation, TLS, and
+  `webSecurity` are never weakened; `webSecurity` is never disabled to
+  "improve" filtering, and no site, rule, or mode can disable HTTPS/cert
+  checks.
+- **Fail-open by design.** An unclassifiable request, an unknown first-party,
+  an evaluation error, or a malformed rule always resolves to ALLOW — never
+  a block and never a crash. Blocking only ever happens for a request that
+  matched a validated, active rule of an active category.
+- **Rules are validated at load time.** Rules with invalid hostnames,
+  resource types, or party scopes are rejected when a list is loaded and
+  reported via the accepted count; no malformed rule can enter matching.
+- **Decision cache cannot go stale.** The bounded decision cache is keyed
+  with a context version that changes on every rule, mode, allowlist, or
+  per-site change, and is cleared on each change — stale or bypassable
+  decisions are impossible.
+- **No interception side effects.** The request pipeline is read-only with
+  respect to web content: it inspects headers/URLs of filterable requests
+  only to classify and match them, and it cancels only blocked requests. It
+  never tampers with cookies, headers, or certificates, and it cannot be
+  reached by web content — it lives in the main process.
+- **Privacy-safe instrumentation.** Recent filter events and per-site stats
+  are in-memory only, hold hostnames and categories — never full URLs, query
+  strings, or payloads — and are never persisted.
+- **Filter lists are explicit.** Every list must declare `license`,
+  `updatedAt`, and `provenance`; nothing is bundled silently. The bundled
+  list is a demo test list using reserved `.test` domains only.
+
 ## Explicit non-goals (never do these)
 
 - Execute arbitrary remote code.

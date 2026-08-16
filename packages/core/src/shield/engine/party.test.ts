@@ -30,9 +30,12 @@ describe('classifyParty', () => {
     );
   });
 
-  it('classifies an unknown first-party as third-party', () => {
-    expect(classifyParty(request('cdn.example.com', null))).toBe('third-party');
-    expect(classifyParty(request('cdn.example.com', ''))).toBe('third-party');
+  it('classifies an unknown first-party as unknown-party (never guesses)', () => {
+    expect(classifyParty(request('cdn.example.com', null))).toBe('unknown-party');
+    expect(classifyParty(request('cdn.example.com', ''))).toBe('unknown-party');
+    expect(classifyParty(request('cdn.example.com', 'not-a-url'))).toBe(
+      'unknown-party',
+    );
   });
 
   it('is case-insensitive', () => {
