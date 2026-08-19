@@ -1,0 +1,935 @@
+{
+  "skill_name": "premium-design",
+  "evals": [
+    {
+      "id": 1,
+      "name": "luxury-landing-page",
+      "prompt": "We're launching 'Horizon', a luxury minimalist watch brand ($500–$2,000). I need a single-page landing page with a hero section featuring a hero shot, a features grid explaining our craftsmanship, and a product showcase carousel. The vibe should be sophisticated, dark, and editorial — think less Apple, more A.P.C. meets Hodinkee. Please deliver production-ready HTML/CSS with no JS framework dependencies.",
+      "expected_output": {
+        "summary": "A complete single-page HTML/CSS landing page for a luxury watch brand with hero, features grid, and product showcase sections, using dark sophisticated aesthetics with gold accents.",
+        "colors": {
+          "primary": "#0a0e1a",
+          "accent": "#c9a84c",
+          "accent_hover": "#d4b856",
+          "accent_light": "#e8d48b",
+          "background": "#f5f0e8",
+          "bg_dark": "#0a0e1a",
+          "bg_surface": "#121626",
+          "text_primary": "#1a1a2e",
+          "text_on_dark": "#e8e4dc",
+          "text_muted": "#6b7280",
+          "border": "#2a2a4e",
+          "palette": ["#0a0e1a", "#121626", "#1a1a2e", "#2a2a4e", "#c9a84c", "#d4b856", "#e8d48b", "#f5f0e8", "#6b7280"]
+        },
+        "typography": {
+          "headings": { "font_family": "Playfair Display", "fallback": "Georgia, serif", "weights": [400, 600, 700], "sizes": { "h1": "4rem", "h2": "2.5rem", "h3": "1.75rem" }, "line_height": 1.15, "letter_spacing": "-0.02em" },
+          "body": { "font_family": "Inter", "fallback": "-apple-system, BlinkMacSystemFont, sans-serif", "weights": [300, 400, 500], "sizes": { "base": "1.125rem", "small": "0.875rem" }, "line_height": 1.6 },
+          "accent": { "font_family": "DM Sans", "weights": [500, 700], "use": "navigation, buttons, pricing" }
+        },
+        "spacing": {
+          "section_padding_y": "120px", "section_padding_x": "5%", "container_max_width": "1280px",
+          "grid_gap": "32px", "content_max_width": "720px", "mobile_padding": "24px"
+        },
+        "accessibility": {
+          "wcag_level": "AA", "contrast_ratio_min": "4.5:1",
+          "focus_indicators": "visible 2px outline with 4px offset using accent color",
+          "color_not_sole_indicator": true, "reduced_motion_support": true,
+          "landmarks": "use <header>, <main>, <section>, <footer> with aria-labels"
+        },
+        "performance": {
+          "font_loading": "swap with preconnect and preload for critical fonts",
+          "image_optimization": "WebP with AVIF fallback, native lazy loading",
+          "critical_css": "inline above-fold styles in <head>",
+          "minimize_reflows": "use transform and opacity for animations, GPU-accelerated"
+        },
+        "responsive": {
+          "approach": "desktop-first",
+          "breakpoints": { "tablet": "768px", "mobile": "480px" },
+          "stacking_changes": "grid collapses to single column at 768px, reduced font sizes at 480px, navigation becomes hamburger"
+        },
+        "animation": {
+          "entrance": "fade-in-up with Intersection Observer, stagger children by 100ms",
+          "hover": "0.3s ease, accent color shifts, subtle scale(1.02) on cards, underline reveal on links",
+          "carousel": "smooth CSS scroll-snap with 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+          "duration_range": "200ms–600ms",
+          "reduced_motion": "disable entrance animations, keep functional transitions"
+        }
+      },
+      "tags": ["landing-page", "luxury", "ecommerce", "dark-mode", "editorial"],
+      "should_trigger": true,
+      "priority": "P0",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "fintech-color-palette",
+      "prompt": "I'm the lead designer at a fintech startup called 'NexusPay'. We're building a B2B payments platform for CFOs and finance directors. I need a color palette that screams trustworthy but doesn't feel like a traditional bank. Modern, confident, tech-forward. Deliver hex codes, HSL values, and explain how each color should be applied across UI surfaces. Bonus points for dark-mode variants.",
+      "expected_output": {
+        "summary": "A comprehensive color system for a fintech SaaS with primary, secondary, neutral, semantic, and surface colors including dark mode.",
+        "colors": {
+          "primary": { "hex": "#1e3a5f", "hsl": "210 52% 25%", "usage": "Primary buttons, key navigation, headings" },
+          "primary_light": { "hex": "#2d6a9f", "hsl": "210 56% 40%", "usage": "Hover states, active links" },
+          "accent": { "hex": "#2dd4bf", "hsl": "173 67% 50%", "usage": "Success states, highlights, secondary CTAs" },
+          "accent_warm": { "hex": "#f59e0b", "hsl": "38 92% 50%", "usage": "Warnings, notifications, ratings" },
+          "neutral": { "50": "#f8fafc", "100": "#f1f5f9", "200": "#e2e8f0", "300": "#cbd5e1", "400": "#94a3b8", "500": "#64748b", "600": "#475569", "700": "#334155", "800": "#1e293b", "900": "#0f172a" },
+          "semantic": { "success": "#10b981", "warning": "#f59e0b", "error": "#ef4444", "info": "#3b82f6" },
+          "surfaces": { "light_bg": "#ffffff", "light_card": "#f8fafc", "dark_bg": "#0f172a", "dark_card": "#1e293b" }
+        },
+        "typography": {
+          "font_family": "Inter", "fallback": "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          "weights": [300, 400, 500, 600, 700],
+          "scale": { "display": "2.5rem/700", "h1": "2rem/600", "h2": "1.5rem/600", "h3": "1.25rem/500", "body": "1rem/400", "small": "0.875rem/400", "caption": "0.75rem/400" },
+          "line_height": { "headings": 1.2, "body": 1.6 }
+        },
+        "spacing": {
+          "unit": "4px", "scale": [4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96, 128],
+          "section_padding_y": "96px", "card_padding": "24px", "content_max_width": "800px"
+        },
+        "accessibility": {
+          "wcag_level": "AA",
+          "contrast_ratios": { "primary_on_white": "6.5:1", "accent_on_dark_bg": "4.8:1", "error_on_white": "4.8:1" },
+          "focus_style": "2px solid accent color with 4px offset"
+        },
+        "performance": { "note": "N/A — this is a palette recommendation, not rendered output" },
+        "responsive": { "note": "N/A — palette is responsive by nature" },
+        "animation": { "note": "N/A — palette recommendation, implementors choose animation" }
+      },
+      "tags": ["color-palette", "fintech", "saas", "dark-mode", "design-system"],
+      "should_trigger": true,
+      "priority": "P1",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "ui-component-polish",
+      "prompt": "Here's my current button and card code — it's functional but looks cheap. Button: <button class='btn btn-primary'>Sign Up</button> / <button class='btn btn-secondary'>Learn More</button> with basic blue/gray styling. Cards are just white boxes with box-shadow: 0 2px 4px. I need you to elevate these: polished hover/active/focus/disabled states, micro-interactions, smooth transitions, modern card with image header, and proper focus rings for accessibility. HTML/CSS only.",
+      "expected_output": {
+        "summary": "Polished CSS for button states (hover, active, focus, disabled) and premium card component with image header, shadows, transitions, and accessibility considerations.",
+        "colors": {
+          "button_primary": "#4f46e5", "button_primary_hover": "#4338ca", "button_primary_active": "#3730a3",
+          "button_secondary": "#e2e8f0", "button_secondary_hover": "#cbd5e1", "button_secondary_active": "#94a3b8",
+          "card_bg": "#ffffff", "card_border": "#e2e8f0", "card_shadow": "rgba(0, 0, 0, 0.08)",
+          "disabled_bg": "#f1f5f9", "disabled_text": "#94a3b8",
+          "focus_ring": "#4f46e5"
+        },
+        "typography": {
+          "button": { "font_family": "Inter, system-ui, sans-serif", "weight": 600, "size": "0.9375rem", "letter_spacing": "0.01em", "text_transform": "none" },
+          "card_title": { "size": "1.25rem", "weight": 600 },
+          "card_body": { "size": "0.9375rem", "weight": 400, "color": "#64748b" }
+        },
+        "spacing": {
+          "button_padding_x": "24px", "button_padding_y": "12px", "button_border_radius": "8px",
+          "card_padding": "24px", "card_border_radius": "12px", "card_image_height": "200px",
+          "card_gap": "12px"
+        },
+        "accessibility": {
+          "wcag_level": "AA", "contrast_ratio_min": "4.5:1",
+          "focus_visible": "2px solid $focus_ring with 2px offset, only on :focus-visible",
+          "disabled_states": "opacity 0.5, cursor not-allowed, aria-disabled support",
+          "reduced_motion": "prefers-reduced-motion disables all transitions"
+        },
+        "performance": {
+          "note": "Use transform and opacity for animations to avoid layout thrashing",
+          "transitions": "0.2s ease for colors, 0.3s cubic-bezier for transforms",
+          "will-change": "use sparingly on hover targets only"
+        },
+        "responsive": {
+          "card_breakpoint": "640px — card becomes full-width on mobile",
+          "button": "full-width on mobile for touch targets"
+        },
+        "animation": {
+          "button_hover": "background 0.2s ease, box-shadow: 0 4px 14px rgba(79,70,229,0.3), translateY(-1px)",
+          "button_active": "translateY(0), shadow shrinks, 0.1s",
+          "card_hover": "box-shadow increases to 0 20px 25px -5px rgba(0,0,0,0.1), translateY(-4px), 0.3s ease",
+          "card_image_zoom": "scale(1.05) on hover, 0.4s ease",
+          "duration_range": "100ms–400ms"
+        }
+      },
+      "tags": ["ui-components", "interaction", "accessibility", "button", "card"],
+      "should_trigger": true,
+      "priority": "P1",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "typography-pairing",
+      "prompt": "I'm designing a digital editorial platform called 'Veritas' — a home for long-form investigative journalism, photo essays, and cultural criticism. Think The New Yorker meets A24. I need font pairing recommendations for headings and body text. The feel should be sophisticated, literary, but not stuffy — we want a young, intellectually curious audience. Include sizing scale, weight recommendations, line-height, and practical CSS. Show me a comparison of 3 pairings.",
+      "expected_output": {
+        "summary": "Three font pairing options for an editorial platform with complete sizing scales, weight recommendations, line-height, letter-spacing, and usage rationale.",
+        "pairings": [
+          {
+            "name": "Classic Editorial", "feeling": "Traditional, authoritative, literary",
+            "headings": { "font_family": "Playfair Display", "fallback": "Georgia, serif", "weights": [400, 700, 900], "letter_spacing": "-0.02em" },
+            "body": { "font_family": "Lora", "fallback": "Georgia, Times New Roman, serif", "weights": [400, 500, 600, 700], "line_height": 1.7 },
+            "sizing_scale": { "display": "4rem/900", "h1": "2.75rem/700", "h2": "2rem/700", "h3": "1.5rem/600", "lead": "1.25rem/400", "body": "1.0625rem/400", "small": "0.875rem/400" }
+          },
+          {
+            "name": "Modern Literary", "feeling": "Contemporary, sharp, refined",
+            "headings": { "font_family": "Cormorant Garamond", "fallback": "Georgia, serif", "weights": [300, 500, 700], "letter_spacing": "-0.01em" },
+            "body": { "font_family": "Proza Libre", "fallback": "system-ui, sans-serif", "weights": [400, 500, 600], "line_height": 1.65 },
+            "sizing_scale": { "display": "4.5rem/300", "h1": "3rem/500", "h2": "2.25rem/500", "h3": "1.5rem/500", "lead": "1.125rem/400", "body": "1rem/400", "small": "0.875rem/400" }
+          },
+          {
+            "name": "Minimalist Serif", "feeling": "Clean, Scandinavian, approachable",
+            "headings": { "font_family": "EB Garamond", "fallback": "Georgia, Times New Roman, serif", "weights": [400, 500, 800], "letter_spacing": "0.01em" },
+            "body": { "font_family": "Source Serif Pro", "fallback": "Georgia, serif", "weights": [300, 400, 600], "line_height": 1.6 },
+            "sizing_scale": { "display": "3.5rem/800", "h1": "2.5rem/500", "h2": "1.75rem/500", "h3": "1.375rem/500", "lead": "1.125rem/400", "body": "1rem/300", "small": "0.8125rem/400" }
+          }
+        ],
+        "accessibility": {
+          "wcag_level": "AA",
+          "body_size_min": "1rem (16px) for body text",
+          "line_length_max": "70–75 characters per line for readability",
+          "contrast_ratio_min": "4.5:1 for body, 3:1 for large text"
+        },
+        "spacing": {
+          "paragraph_gap": "1.5em", "section_spacing": "3rem",
+          "drop_cap_size": "3em", "pull_quote_size": "1.5rem"
+        },
+        "performance": {
+          "font_loading": "swap with preconnect to Google Fonts CDN",
+          "subset": "latin subset only to reduce payload",
+          "variable_fonts": "prefer variable fonts over multiple weights where possible"
+        },
+        "responsive": {
+          "sizing_adjustments": "reduce display/h1 sizes by 30% at mobile (768px breakpoint)",
+          "line_height_increase": "slightly increase line-height at narrow widths for readability"
+        },
+        "animation": { "note": "Typography recommendations don't include animation, but suggest smooth font-loading with FOUT/FOIT handling" }
+      },
+      "tags": ["typography", "editorial", "content", "pairing"],
+      "should_trigger": true,
+      "priority": "P1",
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "design-token-system",
+      "prompt": "We're scaling our design system and need a proper token architecture. We use React 18 + Tailwind CSS 3.x + TypeScript. I need primitive tokens (raw values), semantic tokens (contextual meaning), and component-level tokens. Must support light and dark mode via CSS custom properties. Also include a naming convention strategy and a migration guide from our current tailwind.config.js to the new token system.",
+      "expected_output": {
+        "summary": "A complete three-tier design token system (primitive → semantic → component) with CSS custom properties, light/dark mode, Tailwind integration, naming conventions, and migration path.",
+        "token_architecture": {
+          "primitives": {
+            "naming": "$prefix-type-category-variant (e.g. --color-blue-500)",
+            "categories": ["color", "spacing", "font-size", "font-weight", "line-height", "letter-spacing", "shadow", "border-radius", "opacity", "z-index"],
+            "color_primitives": { "blue": { "50": "#eff6ff", "100": "#dbeafe", "200": "#bfdbfe", "300": "#93c5fd", "400": "#60a5fa", "500": "#3b82f6", "600": "#2563eb", "700": "#1d4ed8", "800": "#1e40af", "900": "#1e3a8a", "950": "#172554" }, "gray": { "50": "#f9fafb", "100": "#f3f4f6", "200": "#e5e7eb", "300": "#d1d5db", "400": "#9ca3af", "500": "#6b7280", "600": "#4b5563", "700": "#374151", "800": "#1f2937", "900": "#111827", "950": "#030712" } },
+            "spacing_scale": { "0": "0px", "1": "4px", "2": "8px", "3": "12px", "4": "16px", "5": "20px", "6": "24px", "8": "32px", "10": "40px", "12": "48px", "16": "64px", "20": "80px", "24": "96px" }
+          },
+          "semantic": {
+            "naming": "--color-bg-primary, --color-text-body, --shadow-card",
+            "light": { "--color-bg-primary": "#ffffff", "--color-bg-secondary": "#f8fafc", "--color-text-body": "#0f172a", "--color-text-muted": "#64748b", "--color-border": "#e2e8f0", "--shadow-sm": "0 1px 2px rgba(0,0,0,0.05)", "--shadow-md": "0 4px 6px rgba(0,0,0,0.07)" },
+            "dark": { "--color-bg-primary": "#0f172a", "--color-bg-secondary": "#1e293b", "--color-text-body": "#f1f5f9", "--color-text-muted": "#94a3b8", "--color-border": "#334155", "--shadow-sm": "0 1px 2px rgba(0,0,0,0.3)", "--shadow-md": "0 4px 6px rgba(0,0,0,0.4)" }
+          },
+          "component": {
+            "naming": "--btn-bg, --card-radius, --input-border",
+            "examples": {
+              "button": { "--btn-bg": "var(--color-primary)", "--btn-text": "#ffffff", "--btn-radius": "8px", "--btn-padding-x": "24px", "--btn-padding-y": "12px", "--btn-font-weight": "600" },
+              "card": { "--card-bg": "var(--color-bg-primary)", "--card-radius": "12px", "--card-padding": "24px", "--card-shadow": "var(--shadow-md)" },
+              "input": { "--input-bg": "var(--color-bg-primary)", "--input-border": "var(--color-border)", "--input-radius": "8px", "--input-padding": "12px 16px" }
+            }
+          }
+        },
+        "tailwind_integration": "Map semantic tokens to Tailwind theme.extend.colors and theme.extend.spacing in tailwind.config.js; use CSS custom properties for dynamic theming",
+        "accessibility": { "wcag_level": "AA", "note": "Token system must enforce contrast ratios at the semantic layer, not primitive layer" },
+        "performance": { "note": "CSS custom properties have negligible performance impact; use @layer for organized cascade" },
+        "responsive": { "note": "Responsive tokens handled via Tailwind breakpoint prefixes, not custom properties" },
+        "animation": { "note": "Define transition-duration and easing tokens as custom properties for consistency" }
+      },
+      "tags": ["design-system", "tokens", "react", "tailwind", "dark-mode", "theming"],
+      "should_trigger": true,
+      "priority": "P0",
+      "files": []
+    },
+    {
+      "id": 6,
+      "name": "analytics-dashboard",
+      "prompt": "Build me a dark-mode dashboard UI for an analytics platform called 'Pulse'. It needs: a sidebar navigation, a top header with search and notifications, a metrics row (4 KPI cards), a line chart widget, a data table with sortable columns, and a real-time activity feed. Make it feel like Stripe's dashboard meets Linear — clean, data-dense but not overwhelming. HTML/CSS/JS, charts can use Canvas or SVG.",
+      "expected_output": {
+        "summary": "A dark-themed analytics dashboard with sidebar, header, KPI cards, line chart, data table, and activity feed, balancing data density with clean typography and visual hierarchy.",
+        "colors": {
+          "bg_primary": "#0d1117",
+          "bg_secondary": "#161b22",
+          "bg_tertiary": "#1c2333",
+          "bg_hover": "#1c2128",
+          "border": "#30363d",
+          "text_primary": "#e6edf3",
+          "text_secondary": "#8b949e",
+          "text_muted": "#6e7681",
+          "chart_blue": "#58a6ff",
+          "chart_green": "#3fb950",
+          "chart_yellow": "#d29922",
+          "chart_red": "#f85149",
+          "chart_purple": "#bc8cff",
+          "accent": "#58a6ff",
+          "accent_hover": "#79c0ff",
+          "kpi_green": "#3fb950",
+          "kpi_red": "#f85149"
+        },
+        "typography": {
+          "ui": { "font_family": "Inter", "fallback": "-apple-system, BlinkMacSystemFont, sans-serif", "weights": [400, 500, 600, 700], "sizes": { "kpi_value": "2rem/600", "kpi_label": "0.8125rem/500", "table_header": "0.75rem/600", "table_cell": "0.8125rem/400", "sidebar_item": "0.875rem/500", "activity_text": "0.8125rem/400", "activity_time": "0.75rem/400" } },
+          "mono": { "font_family": "JetBrains Mono", "fallback": "'Fira Code', monospace", "use": "chart tooltips and numeric data", "weights": [400, 500] }
+        },
+        "spacing": {
+          "sidebar_width": "260px", "header_height": "64px",
+          "kpi_card_padding": "20px", "section_gap": "24px",
+          "table_cell_padding": "12px 16px", "activity_item_gap": "16px",
+          "chart_padding": "24px"
+        },
+        "accessibility": {
+          "wcag_level": "AA", "contrast_ratio_min": "4.5:1 for text, 3:1 for large text",
+          "data_viz": "patterns + labels in addition to color for chart elements",
+          "keyboard_nav": "sidebar items focusable, table sortable via keyboard",
+          "aria_labels": "charts, notifications, search input"
+        },
+        "performance": {
+          "chart_rendering": "use requestAnimationFrame for real-time updates, debounce resize handlers",
+          "virtualization": "suggest virtual scrolling for data tables with >50 rows",
+          "lazy_load": "defer non-critical widgets, lazy load activity feed content"
+        },
+        "responsive": {
+          "breakpoints": { "desktop": "1200px+", "tablet": "768px–1199px", "mobile": "<768px" },
+          "sidebar": "collapsible to icon-only at tablet, drawer overlay at mobile",
+          "kpi_grid": "4 columns → 2 columns at tablet → 1 column at mobile",
+          "table": "horizontal scroll on mobile, sticky first column"
+        },
+        "animation": {
+          "sidebar_transition": "width 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          "kpi_entrance": "counter animation from 0 to value, 1s ease-out",
+          "chart_update": "smooth transition on data change, 0.5s ease",
+          "hover_states": "0.15s ease for row hover, sidebar item highlight",
+          "reduced_motion": "disable counter animation and entrance effects"
+        }
+      },
+      "tags": ["dashboard", "data-viz", "dark-mode", "analytics", "charts"],
+      "should_trigger": true,
+      "priority": "P0",
+      "files": []
+    },
+    {
+      "id": 7,
+      "name": "fitness-mobile-app",
+      "prompt": "Design the UI for a fitness tracking mobile app called 'Sprint'. Key screens: onboarding (3 slides), home dashboard with today's activity rings, a workout detail screen, and a progress/charts screen. The app should feel energetic but premium — think Nike Training Club meets Strava. Use a mobile-first approach but also describe how it adapts to tablet. Deliver HTML/CSS/JS that looks like a native app (no frameworks).",
+      "expected_output": {
+        "summary": "Mobile-first fitness app UI with onboarding, activity dashboard, workout detail, and progress screens, using energetic colors and native-feeling interactions.",
+        "colors": {
+          "primary": "#6c5ce7",
+          "primary_light": "#a29bfe",
+          "primary_dark": "#5541d9",
+          "secondary": "#00cec9",
+          "accent": "#fd79a8",
+          "bg_primary": "#ffffff",
+          "bg_secondary": "#f8f9fa",
+          "bg_card": "#ffffff",
+          "bg_dark": "#1a1a2e",
+          "text_primary": "#1a1a2e",
+          "text_secondary": "#636e72",
+          "text_on_primary": "#ffffff",
+          "success": "#00b894",
+          "warning": "#fdcb6e",
+          "activity_ring_blue": "#6c5ce7",
+          "activity_ring_green": "#00cec9",
+          "activity_ring_pink": "#fd79a8"
+        },
+        "typography": {
+          "font_family": "Inter", "fallback": "-apple-system, Helvetica, sans-serif",
+          "weights": [400, 500, 600, 700, 800],
+          "sizes": { "onboarding_title": "1.75rem/700", "onboarding_desc": "1rem/400", "kpi_value": "2.5rem/800", "kpi_label": "0.75rem/600", "section_title": "1.25rem/700", "workout_name": "1.125rem/600", "workout_detail": "0.9375rem/400", "timer": "3rem/700", "tab_label": "0.75rem/600" },
+          "letter_spacing": "-0.02em for headings, 0.04em uppercase for labels"
+        },
+        "spacing": {
+          "screen_padding": "20px", "card_padding": "20px", "card_radius": "16px",
+          "bottom_bar_height": "60px", "tab_bar_height": "72px", "button_height": "52px",
+          "activity_ring_size": "180px", "section_gap": "24px", "item_gap": "12px"
+        },
+        "accessibility": {
+          "wcag_level": "AA",
+          "touch_targets": "minimum 48x48dp for all interactive elements",
+          "font_scaling": "support Dynamic Type / OS font scaling up to 200%",
+          "contrast_ratio_min": "4.5:1",
+          "activity_rings": "use labels and text alongside color segments"
+        },
+        "performance": {
+          "animation_framework": "use requestAnimationFrame, avoid setTimeout for animations",
+          "image_optimization": "responsive images via srcset, WebP preferred",
+          "reduce_motion": "respect prefers-reduced-motion for all animations"
+        },
+        "responsive": {
+          "approach": "mobile-first",
+          "breakpoints": { "mobile": "<768px", "tablet": "768px–1024px", "desktop": ">1024px" },
+          "tablet": "activity rings side-by-side, multi-column workout grid, split-view onboarding",
+          "safe_areas": "respect safe-area-inset-* for notched devices"
+        },
+        "animation": {
+          "page_transitions": "slide-left-right for navigation, 0.3s ease",
+          "activity_rings": "circular progress animation, 1.5s ease-out on appear",
+          "tab_switch": "fade 0.2s, active tab indicator slides 0.3s",
+          "button_tap": "scale(0.96) on press, 0.1s, spring-like release",
+          "onboarding": "horizontal snap scroll with progress dots, stagger content fade-in",
+          "duration_range": "100ms–1500ms",
+          "reduced_motion": "crossfade replaces slide transitions"
+        }
+      },
+      "tags": ["mobile", "fitness", "dark-mode", "onboarding", "charts", "native-feel"],
+      "should_trigger": true,
+      "priority": "P1",
+      "files": []
+    },
+    {
+      "id": 8,
+      "name": "ecommerce-product-page",
+      "prompt": "My brand 'Apotheke' sells premium sustainable skincare — serums, moisturizers, SPF — at $40–$120 per product. The product page needs: hero product image with zoom, multiple variant thumbnails, ingredient accordion, reviews carousel, and add-to-bag with sticky add-to-cart on scroll. The aesthetic should be clean, spa-like, and trustworthy — think Glossier meets Aesop. Deliver HTML/CSS/JS. Make the images placeholder-friendly with gradients.",
+      "expected_output": {
+        "summary": "A premium skincare product detail page with image gallery, variant selection, ingredient accordion, reviews, and sticky cart, using a clean spa-like aesthetic.",
+        "colors": {
+          "primary": "#2d4a3e",
+          "primary_light": "#4a7c6b",
+          "accent": "#e0a899",
+          "accent_light": "#f0d5cc",
+          "bg_primary": "#faf8f5",
+          "bg_secondary": "#f5f1ec",
+          "bg_card": "#ffffff",
+          "bg_warm": "#fdfcfa",
+          "text_primary": "#1a1a1a",
+          "text_secondary": "#6b6258",
+          "text_muted": "#a0988e",
+          "border": "#e8e2da",
+          "success": "#3fb950",
+          "sale": "#cc4444",
+          "star": "#d4a853",
+          "placeholder_gradient": "linear-gradient(135deg, #e8e2da, #f5f1ec)"
+        },
+        "typography": {
+          "headings": { "font_family": "Cormorant Garamond", "fallback": "Georgia, serif", "weights": [300, 500, 600], "sizes": { "product_name": "2.5rem/500", "price": "1.75rem/500", "section_title": "1.25rem/500" }, "letter_spacing": "-0.01em" },
+          "body": { "font_family": "Poppins", "fallback": "system-ui, sans-serif", "weights": [300, 400, 500], "sizes": { "description": "0.9375rem/300", "ingredient": "0.875rem/400", "review_text": "0.875rem/400", "small": "0.75rem/500", "button": "0.8125rem/500" }, "letter_spacing": "0.02em for uppercase labels" }
+        },
+        "spacing": {
+          "section_padding": "64px", "product_grid_gap": "48px",
+          "card_padding": "28px", "thumbnail_gap": "12px",
+          "accordion_padding": "16px 0", "accordion_border": "1px solid #e8e2da",
+          "sticky_bar_height": "72px", "button_padding": "16px 32px", "button_radius": "0",
+          "review_item_gap": "20px"
+        },
+        "accessibility": {
+          "wcag_level": "AA", "contrast_ratio_min": "4.5:1",
+          "image_zoom": "provide alternative text description for zoomed view",
+          "variant_selection": "aria-selected, aria-label for colorblind users",
+          "accordion": "proper aria-expanded, aria-controls, role=button",
+          "sticky_cart": "ensure it doesn't trap focus, has close mechanism on mobile"
+        },
+        "performance": {
+          "image_zoom": "use CSS transform: scale() instead of swapping to high-res image until needed",
+          "lazy_load": "native lazy loading for below-fold images, reviews loaded on interaction",
+          "accordion": "use content-visibility: auto for off-screen accordion panels",
+          "font_display": "swap for body, optional for display font"
+        },
+        "responsive": {
+          "breakpoints": { "desktop": "1024px+", "tablet": "768px–1023px", "mobile": "<768px" },
+          "product_grid": "side-by-side (50/50) on desktop, stacked on mobile",
+          "thumbnail_bar": "horizontal row on desktop, horizontal scroll on mobile",
+          "sticky_cart": "appears at bottom on mobile, inline on desktop",
+          "image_zoom": "fullscreen overlay on mobile instead of cursor-follow"
+        },
+        "animation": {
+          "variant_switch": "crossfade 0.3s between product images",
+          "image_zoom": "smooth scale on hover, follows cursor, 0.2s",
+          "accordion": "max-height transition 0.3s ease, rotate chevron 0.2s",
+          "add_to_cart": "button briefly scales (1.05) then adds item count badge animation",
+          "review_carousel": "snap scroll, 0.4s cubic-bezier",
+          "sticky_appear": "slide-up from bottom on mobile, 0.3s ease"
+        }
+      },
+      "tags": ["ecommerce", "product-page", "luxury", "skincare", "accordion", "carousel"],
+      "should_trigger": true,
+      "priority": "P0",
+      "files": []
+    },
+    {
+      "id": 9,
+      "name": "multi-step-registration-form",
+      "prompt": "We need a multi-step registration form for 'Veridian', a financial wellness app. Steps: 1) email + password, 2) personal info (name, DOB, phone), 3) financial profile (income range, goals), 4) verification (ID upload + selfie). Each step must show proper validation states: idle, typing, valid, invalid with error messages, and success. Also show a loading state during verification. The form should feel trustworthy and calm — not stressful like taxes. HTML/CSS/JS, inline validation, no form libraries.",
+      "expected_output": {
+        "summary": "A four-step registration form with real-time inline validation, showing idle, typing, valid, invalid, and loading states for each field, designed to feel calm and trustworthy.",
+        "colors": {
+          "primary": "#6366f1",
+          "primary_light": "#818cf8",
+          "primary_dark": "#4f46e5",
+          "success": "#22c55e",
+          "success_bg": "#f0fdf4",
+          "error": "#ef4444",
+          "error_bg": "#fef2f2",
+          "warning": "#f59e0b",
+          "warning_bg": "#fffbeb",
+          "idle_border": "#d1d5db",
+          "typing_border": "#6366f1",
+          "valid_border": "#22c55e",
+          "invalid_border": "#ef4444",
+          "bg_primary": "#ffffff",
+          "bg_form": "#f8fafc",
+          "text_primary": "#1e293b",
+          "text_secondary": "#64748b",
+          "text_muted": "#94a3b8",
+          "skeleton_bg": "#e2e8f0",
+          "skeleton_shimmer": "linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%)"
+        },
+        "typography": {
+          "font_family": "Inter", "fallback": "system-ui, sans-serif",
+          "weights": [400, 500, 600, 700],
+          "sizes": {
+            "step_title": "1.5rem/600", "step_desc": "0.9375rem/400",
+            "field_label": "0.8125rem/500", "field_input": "0.9375rem/400",
+            "field_error": "0.75rem/500", "field_help": "0.75rem/400",
+            "button": "0.9375rem/600", "step_indicator": "0.75rem/600"
+          },
+          "line_height": { "body": 1.5, "input": 1.5 }
+        },
+        "spacing": {
+          "form_max_width": "480px", "form_padding": "40px",
+          "field_gap": "20px", "input_padding": "12px 16px", "input_radius": "8px",
+          "button_padding": "14px 24px", "button_radius": "8px",
+          "step_indicator_gap": "8px", "step_connector_width": "60px",
+          "error_icon_size": "16px", "error_message_margin_top": "4px"
+        },
+        "validation_states": {
+          "idle": { "border": "1px solid $idle_border", "bg": "#ffffff" },
+          "typing": { "border": "1px solid $typing_border", "bg": "#ffffff", "icon": "pencil" },
+          "valid": { "border": "1px solid $valid_border", "bg": "$success_bg", "icon": "checkmark", "message": "Looks good!" },
+          "invalid": { "border": "1px solid $invalid_border", "bg": "$error_bg", "icon": "exclamation", "message": "Error description" },
+          "loading": { "border": "1px solid $idle_border", "bg": "#ffffff", "icon": "spinner", "animation": "rotate 1s linear infinite" },
+          "success_step": { "icon": "large checkmark", "bg": "$success_bg", "animation": "scale-in 0.3s" }
+        },
+        "accessibility": {
+          "wcag_level": "AA",
+          "error_announcement": "use aria-live='polite' region for error messages",
+          "field_validation": "aria-invalid, aria-describedby for errors",
+          "focus_management": "auto-focus first field of each step on forward, focus previous step indicator on back",
+          "step_indicator": "aria-current='step' on active step, screenreader announcements on step change",
+          "keyboard": "Enter advances step from last field, Escape cancels file upload",
+          "color_not_sole": "validation icons and text labels in addition to border colors"
+        },
+        "performance": {
+          "validation": "debounce async validation (email uniqueness) by 300ms",
+          "file_upload": "compress ID images client-side before upload, preview using objectURL",
+          "step_transition": "pre-render adjacent steps in DOM, toggle visibility"
+        },
+        "responsive": {
+          "breakpoints": { "tablet": "768px", "mobile": "480px" },
+          "form": "full-width on mobile, centered card on desktop",
+          "steps": "vertical stacked on mobile, horizontal indicators on tablet+",
+          "file_upload": "camera capture option via accept='image/* capture='environment' on mobile"
+        },
+        "animation": {
+          "step_transition": "slide-left for next, slide-right for previous, 0.3s ease",
+          "validation_icon": "fade-in 0.2s, checkmark draws with stroke-dashoffset animation",
+          "error_shake": "horizontal shake 0.4s on invalid submission attempt",
+          "progress_bar": "smooth width transition between steps, 0.4s ease",
+          "loading_spinner": "continuous rotation 1s linear",
+          "success_animation": "step number transforms to checkmark with scale-in 0.3s",
+          "duration_range": "100ms–500ms"
+        }
+      },
+      "tags": ["form", "validation", "multi-step", "financial", "accessibility"],
+      "should_trigger": true,
+      "priority": "P1",
+      "files": []
+    },
+    {
+      "id": 10,
+      "name": "booking-confirmation-email",
+      "prompt": "I need an HTML email template for a travel booking platform called 'Drift'. When a customer books a hotel or experience, we send a confirmation email with: booking reference, trip summary (dates, location, accommodation), price breakdown, cancellation policy, and a CTA to 'View Trip Details'. Must render well in Outlook, Gmail, and Apple Mail. I know email CSS is limited — work within those constraints. Make it feel premium, not spammy.",
+      "expected_output": {
+        "summary": "A transactional HTML email template for booking confirmation with inline CSS, table-based layout, responsive design for mobile, and email client compatibility notes.",
+        "colors": {
+          "primary": "#2563eb",
+          "primary_dark": "#1d4ed8",
+          "bg_body": "#f4f4f5",
+          "bg_container": "#ffffff",
+          "bg_accent": "#eff6ff",
+          "bg_footer": "#1e293b",
+          "text_primary": "#1e293b",
+          "text_secondary": "#64748b",
+          "text_muted": "#94a3b8",
+          "text_on_dark": "#cbd5e1",
+          "border": "#e2e8f0",
+          "success": "#22c55e",
+          "divider": "#e2e8f0",
+          "cta_text": "#ffffff"
+        },
+        "typography": {
+          "font_family": "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+          "weights": [400, 600, 700],
+          "sizes": {
+            "preheader": "0px (hidden preheader text)",
+            "logo_area": "24px",
+            "heading": "24px/700",
+            "section_title": "16px/600",
+            "body_text": "15px/400",
+            "small_text": "13px/400",
+            "price": "18px/700",
+            "footer": "12px/400"
+          },
+          "line_height": 1.5
+        },
+        "spacing": {
+          "email_max_width": "600px",
+          "container_padding": "40px",
+          "section_gap": "32px",
+          "item_padding": "16px 0",
+          "button_padding": "14px 32px",
+          "divider_margin": "24px 0"
+        },
+        "accessibility": {
+          "wcag_level": "AA (as supported by email clients)",
+          "contrast_ratio_min": "4.5:1",
+          "alt_text": "all images must have descriptive alt text",
+          "semantic": "use <th> for table headers, role='presentation' on layout tables",
+          "language": "lang='en' on <html>",
+          "preheader": "hidden preheader for screen reader context"
+        },
+        "performance": {
+          "inline_css": "all styles must be inline — no <style> tags for Outlook compatibility",
+          "image_hosting": "absolute URLs, use HTTPS, keep under 200KB total",
+          "font_loading": "use system fonts only, no web fonts (Outlook incompatible)"
+        },
+        "responsive": {
+          "approach": "mobile-first via @media queries in <style> (Gmail and Apple Mail support)",
+          "breakpoint": "480px",
+          "stacking": "two-column sections collapse to single column, font sizes slightly reduced, button becomes full-width",
+          "fluid_images": "img { max-width: 100%; height: auto; }",
+          "outlook": "conditional comments for width, VML for background images"
+        },
+        "animation": { "note": "No animation support in email — use static design only" }
+      },
+      "tags": ["email", "transactional", "responsive", "travel", "table-layout"],
+      "should_trigger": "partial",
+      "trigger_condition": "Triggers for the visual layout and color aspects, but limited by email CSS constraints. Premium design principles still apply to typography, spacing, and hierarchy.",
+      "priority": "P2",
+      "files": []
+    },
+    {
+      "id": 11,
+      "name": "component-library-docs",
+      "prompt": "We're building an internal component library called 'Primer' and need a documentation site to showcase our components. Design a page layout that includes: sidebar navigation (component list), a main content area with component preview + code snippet tabs, a props/API table, and a dark/light mode toggle. The vibe should be clean and developer-friendly — like Storybook's docs view mixed with Radix Themes. React optional, just give me the HTML/CSS/JS layout.",
+      "expected_output": {
+        "summary": "A design system documentation page layout with sidebar navigation, component preview with code tabs, props table, and theme toggle, optimized for developer readability.",
+        "colors": {
+          "primary": "#8b5cf6",
+          "primary_light": "#a78bfa",
+          "primary_dark": "#7c3aed",
+          "bg_primary": { "light": "#ffffff", "dark": "#0f172a" },
+          "bg_secondary": { "light": "#f8fafc", "dark": "#1e293b" },
+          "bg_sidebar": { "light": "#f1f5f9", "dark": "#1e293b" },
+          "bg_code": { "light": "#1e293b", "dark": "#0d1117" },
+          "border": { "light": "#e2e8f0", "dark": "#334155" },
+          "text_primary": { "light": "#0f172a", "dark": "#f1f5f9" },
+          "text_secondary": { "light": "#64748b", "dark": "#94a3b8" },
+          "text_code": { "light": "#e2e8f0", "dark": "#e6edf3" },
+          "syntax_keyword": "#c792ea",
+          "syntax_string": "#c3e88d",
+          "syntax_function": "#82aaff",
+          "syntax_comment": "#546e7a"
+        },
+        "typography": {
+          "ui": { "font_family": "Inter", "fallback": "-apple-system, BlinkMacSystemFont, sans-serif", "weights": [400, 500, 600, 700], "sizes": { "page_title": "1.75rem/700", "section_title": "1.25rem/600", "component_name": "1rem/600", "sidebar_item": "0.875rem/500", "table_header": "0.75rem/600", "table_cell": "0.8125rem/400" } },
+          "code": { "font_family": "JetBrains Mono", "fallback": "'Fira Code', 'Cascadia Code', monospace", "weights": [400, 500], "sizes": { "code_block": "0.8125rem/400", "inline_code": "0.8125rem/400" } }
+        },
+        "spacing": {
+          "sidebar_width": "280px", "content_max_width": "960px",
+          "section_padding": "40px", "component_card_padding": "24px",
+          "code_block_radius": "8px", "code_padding": "20px",
+          "table_cell_padding": "12px 16px", "sidebar_item_padding": "8px 16px",
+          "tab_gap": "0", "tab_height": "40px"
+        },
+        "accessibility": {
+          "wcag_level": "AA",
+          "theme_toggle": "aria-pressed, respects prefers-color-scheme as default",
+          "code_syntax": "ensure syntax highlighting has 4.5:1 contrast against code bg",
+          "skip_link": "skip to content link at top of page",
+          "sidebar": "aria-tree or proper nav landmark with aria-label",
+          "focus_trap": "no trap, but manage focus when sidebar toggles on mobile"
+        },
+        "performance": {
+          "syntax_highlighting": "client-side highlighting with debounced input, or pre-rendered with Prism/Shiki",
+          "theme_switch": "CSS custom properties switching, no FOUC — load user preference in <head> script",
+          "code_blocks": "use content-visibility: auto for below-fold code samples"
+        },
+        "responsive": {
+          "breakpoints": { "desktop": "1024px+", "tablet": "768px–1023px", "mobile": "<768px" },
+          "sidebar": "overlay drawer with hamburger on mobile, persistent on desktop",
+          "component_preview": "stacked vertically on mobile (preview above code instead of side-by-side)"
+        },
+        "animation": {
+          "theme_toggle": "smooth transition 0.3s on background-color and color via CSS custom properties",
+          "sidebar_open": "slide from left 0.3s ease, backdrop fade 0.2s",
+          "tab_switch": "underline indicator slides 0.2s, content fades 0.15s",
+          "code_copy": "tooltip appears 'Copied!' with fade-in 0.2s, disappears after 2s"
+        }
+      },
+      "tags": ["design-system", "documentation", "developer-tools", "dark-mode", "code-blocks"],
+      "should_trigger": true,
+      "priority": "P1",
+      "files": []
+    },
+    {
+      "id": 12,
+      "name": "creative-404-page",
+      "prompt": "I need a 404 page for a creative agency called 'Studio Mosaic'. They're a colorful, playful brand that does animation, illustration, and web design. The 404 should be fun, not frustrating — maybe an interactive canvas animation, a playful illustration, or a creative layout that showcases their personality while clearly communicating the error. Include a search bar and links back to key sections (Work, About, Contact). HTML/CSS/JS, can use Canvas for the interactive element.",
+      "expected_output": {
+        "summary": "A creative, playful 404 error page with interactive canvas animation, clear error messaging, search functionality, and navigation links reflecting the agency's colorful brand.",
+        "colors": {
+          "bg_primary": "#0f0f0f",
+          "bg_secondary": "#1a1a1a",
+          "accent_rose": "#f43f5e",
+          "accent_blue": "#3b82f6",
+          "accent_yellow": "#fbbf24",
+          "accent_green": "#22c55e",
+          "accent_purple": "#a855f7",
+          "accent_orange": "#f97316",
+          "text_primary": "#fafafa",
+          "text_secondary": "#a3a3a3",
+          "text_muted": "#737373",
+          "border": "#262626",
+          "card_bg": "#1a1a1a",
+          "input_bg": "#262626",
+          "input_focus": "#3b82f6"
+        },
+        "typography": {
+          "display": { "font_family": "'Space Grotesk' or 'Clash Display'", "fallback": "system-ui, sans-serif", "weights": [500, 700], "sizes": { "error_code": "8rem/700", "error_title": "2rem/500", "error_message": "1.125rem/400" }, "letter_spacing": "-0.03em" },
+          "body": { "font_family": "Inter", "fallback": "system-ui, sans-serif", "weights": [400, 500], "sizes": { "body": "0.9375rem/400", "button": "0.875rem/500", "small": "0.75rem/400" } }
+        },
+        "spacing": {
+          "section_padding": "80px", "content_max_width": "600px",
+          "error_code_margin": "24px", "nav_links_gap": "16px",
+          "search_max_width": "400px", "search_padding": "14px 20px", "search_radius": "9999px",
+          "button_padding": "12px 24px", "button_radius": "9999px"
+        },
+        "accessibility": {
+          "wcag_level": "AA",
+          "animation_disabled": "static fallback for prefers-reduced-motion",
+          "search_label": "visible label or aria-label on search input",
+          "error_announcement": "page title updates to '404 - Page Not Found | Studio Mosaic'",
+          "focus_management": "focus moves to main content on navigation from broken link",
+          "canvas": "provide static text description of animation for screen readers"
+        },
+        "performance": {
+          "canvas_animation": "use requestAnimationFrame, limit to 30fps when not in viewport via Intersection Observer",
+          "lazy_assets": "defer canvas initialization until page load completes",
+          "no_bloat": "keep the interactive element lightweight — no heavy libraries"
+        },
+        "responsive": {
+          "breakpoints": { "tablet": "768px", "mobile": "480px" },
+          "layout": "centered single column, error code shrinks to 4rem on mobile",
+          "canvas": "reduce particle count by 50% on mobile for performance",
+          "links": "vertical stack on mobile, horizontal row on desktop"
+        },
+        "animation": {
+          "canvas_interactive": "mouse-tracked particle system or floating shapes in brand colors, 60fps",
+          "error_code": "subtle float animation 3s ease-in-out infinite",
+          "link_hover": "color morph between brand accent colors, 0.3s",
+          "search_focus": "border glows with accent color, 0.2s",
+          "page_entrance": "staggered fade-in of elements: canvas → error code → message → search → links, each 100ms apart",
+          "duration_range": "100ms–3s"
+        }
+      },
+      "tags": ["error-page", "404", "creative", "canvas", "interactive", "agency"],
+      "should_trigger": true,
+      "priority": "P2",
+      "files": []
+    },
+    {
+      "id": 13,
+      "name": "news-skeleton-loading",
+      "prompt": "I'm building a news aggregator app called 'Current'. The home page loads articles from multiple sources and it can be slow. I need skeleton loading screens for: 1) a featured story card (large hero), 2) a grid of standard article cards, 3) a sidebar with trending topics list, and 4) a detail/article page layout. Show me the HTML/CSS for the skeleton states AND the loaded states. Include shimmer animation and proper content reveal transition. Dark mode too.",
+      "expected_output": {
+        "summary": "Skeleton loading components for a news app featuring hero card, article grid, trending sidebar, and article detail page, with shimmer animation and smooth content reveal transitions in both light and dark mode.",
+        "colors": {
+          "light": { "skeleton_base": "#e5e7eb", "skeleton_shimmer_highlight": "#f3f4f6", "bg": "#ffffff", "bg_card": "#f9fafb", "text": "#111827", "text_muted": "#6b7280", "border": "#e5e7eb" },
+          "dark": { "skeleton_base": "#374151", "skeleton_shimmer_highlight": "#4b5563", "bg": "#111827", "bg_card": "#1f2937", "text": "#f9fafb", "text_muted": "#9ca3af", "border": "#374151" },
+          "shimmer_gradient_light": "linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%)",
+          "shimmer_gradient_dark": "linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%)",
+          "accent": "#2563eb"
+        },
+        "typography": {
+          "font_family": "Inter, system-ui, sans-serif",
+          "skeleton_text_proxy": "use same line-height as rendered text, rounded corners via border-radius",
+          "skeleton_heading_sizes": { "hero_title": "1.75rem", "card_title": "1.125rem", "sidebar_item": "0.875rem" },
+          "skeleton_body_sizes": { "hero_summary": "0.9375rem", "card_summary": "0.8125rem", "meta": "0.75rem" }
+        },
+        "accessibility": {
+          "wcag_level": "AA",
+          "aria_busy": "role='status' aria-busy='true' on skeleton containers, removed on load",
+          "aria_label": "aria-label='Loading content' on skeleton regions",
+          "reduced_motion": "prefers-reduced-motion: replace shimmer animation with static opacity pulse at 50%",
+          "no_flash": "never show skeleton after content is rendered (use state management to track loading)"
+        },
+        "performance": {
+          "shimmer_animation": "use CSS animation with background-position, not JavaScript",
+          "gpu_acceleration": "use translateZ(0) or will-change on shimmer pseudo-elements",
+          "content_visibility": "use content-visibility: auto on article cards outside viewport"
+        },
+        "responsive": {
+          "breakpoints": { "tablet": "768px", "mobile": "480px" },
+          "hero": "full-width on all sizes, but height reduces at mobile",
+          "article_grid": "3 columns → 2 at tablet → 1 at mobile",
+          "sidebar": "hidden on mobile, revealed at tablet+"
+        },
+        "animation": {
+          "shimmer": "background-position-x: -200% to 200% over 1.5s, linear, infinite",
+          "content_reveal": "fade-in 0.3s ease when skeleton is replaced with content",
+          "stagger": "skeleton cards stagger appearance by 50ms each for perceived speed",
+          "duration_range": "50ms–1500ms",
+          "reduced_motion_alt": "opacity pulsing between 0.3 and 1 over 2s"
+        }
+      },
+      "tags": ["loading", "skeleton", "news", "shimmer", "content-reveal", "dark-mode"],
+      "should_trigger": "partial",
+      "trigger_condition": "Triggers for visual design of skeleton components and animations, but may need collaboration with UX skill for loading state architecture and timing logic.",
+      "priority": "P2",
+      "files": []
+    },
+    {
+      "id": 14,
+      "name": "travel-hero-video",
+      "prompt": "Design a hero section for 'Wanderlust', a luxury adventure travel brand. The hero needs a full-viewport background video (aerial drone footage of mountains/coastlines), a headline overlay, a sub-headline, a dual CTA (primary 'Explore Trips' / secondary 'Watch Film'), and a scroll indicator at the bottom. The video should have a dark gradient overlay for text readability. The brand is adventurous but refined — think National Geographic meets Aman Resorts. HTML/CSS/JS video player, graceful fallback for reduced motion and mobile.",
+      "expected_output": {
+        "summary": "A full-viewport hero section with background video, dark gradient overlay, headline, dual CTAs, scroll indicator, and graceful fallback for reduced motion and mobile.",
+        "colors": {
+          "overlay_gradient": "linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.6) 100%)",
+          "overlay_hard_bottom": "linear-gradient(to bottom, rgba(0,0,0,0.2) 60%, rgba(0,0,0,0.8) 100%)",
+          "text_primary": "#ffffff",
+          "text_secondary": "rgba(255,255,255,0.8)",
+          "text_muted": "rgba(255,255,255,0.5)",
+          "accent": "#fbbf24",
+          "accent_hover": "#f59e0b",
+          "cta_primary_bg": "#fbbf24",
+          "cta_primary_text": "#1a1a1a",
+          "cta_secondary_border": "rgba(255,255,255,0.6)",
+          "cta_secondary_hover": "rgba(255,255,255,0.1)",
+          "scroll_indicator": "rgba(255,255,255,0.6)",
+          "fallback_bg": "#1a1a1a",
+          "fallback_image_overlay": "rgba(0,0,0,0.5)"
+        },
+        "typography": {
+          "headline": { "font_family": "'Tiempos Headline' or 'Playfair Display'", "fallback": "Georgia, serif", "size": "4.5rem/700", "line_height": 1.05, "letter_spacing": "-0.02em" },
+          "subheadline": { "font_family": "Inter", "weight": 300, "size": "1.25rem", "line_height": 1.4, "letter_spacing": "0.02em", "max_width": "600px" },
+          "cta": { "font_family": "Inter", "weight": 600, "size": "0.9375rem", "letter_spacing": "0.05em", "text_transform": "uppercase" },
+          "scroll_indicator": { "font_family": "Inter", "weight": 400, "size": "0.75rem", "letter_spacing": "0.1em", "text_transform": "uppercase" }
+        },
+        "spacing": {
+          "hero_min_height": "100vh", "content_padding": "0 5%",
+          "headline_margin_bottom": "16px", "subheadline_margin_bottom": "40px",
+          "cta_gap": "16px", "cta_padding_x": "32px", "cta_padding_y": "16px",
+          "cta_border_radius": "4px (or pill 9999px based on brand preference)",
+          "scroll_indicator_bottom": "40px", "scroll_indicator_size": "24px"
+        },
+        "accessibility": {
+          "wcag_level": "AA",
+          "video_controls": "native controls as fallback, autoplay with muted required",
+          "reduced_motion": "prefers-reduced-motion: replace video with static hero image, no autoplay",
+          "alt_text": "aria-label describing video content",
+          "text_readability": "ensure 4.5:1 contrast for all text over video overlay",
+          "skip_video": "skip link to jump past hero section to main content",
+          "no_autoplay_on_mobile": "respect mobile browser autoplay restrictions, show static fallback"
+        },
+        "performance": {
+          "video_format": "MP4 (H.264) with WebM (VP9) fallback, compress to 5Mbps max",
+          "video_sizing": "reserve aspect-ratio container to prevent CLS, use object-fit: cover",
+          "poster_image": "provide high-quality JPEG/WebP poster that loads before video",
+          "lazy_load": "defer video loading with preload='metadata', use Intersection Observer to start playback",
+          "mobile_fallback": "serve static image instead of video on slow connections (detect via Network Information API or connection type)"
+        },
+        "responsive": {
+          "breakpoints": { "desktop": "1024px+", "tablet": "768px–1023px", "mobile": "<768px" },
+          "headline": "4.5rem → 3rem (tablet) → 2rem (mobile)",
+          "subheadline": "1.25rem → 1rem (mobile)",
+          "ctas": "side-by-side on desktop, stacked full-width on mobile, full-width touch targets (min 48px)",
+          "video": "video continues full-width on tablet, static image on mobile (battery/data conservation)"
+        },
+        "animation": {
+          "video_transition": "crossfade between poster image and video playback, 0.5s",
+          "text_entrance": "staggered: headline fades in (0.6s), then subheadline (0.8s), then CTAs (1s), then scroll indicator (1.2s)",
+          "scroll_indicator": "bounce animation 2s infinite, opacity pulses",
+          "cta_hover": "primary: background darkens 0.2s, secondary: border fills with background 0.3s",
+          "parallax": "optional subtle parallax on video or overlay as user scrolls away, 0.5x speed",
+          "duration_range": "200ms–1200ms"
+        }
+      },
+      "tags": ["hero", "video", "landing-page", "travel", "luxury", "overlay"],
+      "should_trigger": true,
+      "priority": "P0",
+      "files": []
+    },
+    {
+      "id": 15,
+      "name": "saas-navigation-mega-menu",
+      "prompt": "We're redesigning the navigation for 'Forge', a developer tools SaaS (CI/CD, monitoring, logging). The current nav is a flat list of 12 links — it's overwhelming. We need a mega-menu navigation with: 1) Main nav bar with logo + product name, 2) 4 dropdown mega-menus (Products, Solutions, Developers, Pricing), 3) Each mega-menu has columns with icon + heading + description links, 4) A featured section (e.g. 'New: AI-powered debugging'), 5) CTA buttons 'Start Free Trial' + 'Sign In'. Must be keyboard accessible and responsive. HTML/CSS/JS.",
+      "expected_output": {
+        "summary": "A responsive mega-menu navigation for a developer tools SaaS with four dropdowns, multi-column layouts, featured content sections, CTAs, and full keyboard accessibility.",
+        "colors": {
+          "nav_bg": "#ffffff",
+          "nav_border": "#e2e8f0",
+          "nav_text": "#1e293b",
+          "nav_text_hover": "#4f46e5",
+          "dropdown_bg": "#ffffff",
+          "dropdown_border": "#e2e8f0",
+          "dropdown_shadow": "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)",
+          "primary": "#4f46e5",
+          "primary_hover": "#4338ca",
+          "accent": "#6366f1",
+          "section_bg": "#f8fafc",
+          "featured_bg": "#eef2ff",
+          "featured_border": "#c7d2fe",
+          "icon_bg": "#eef2ff",
+          "icon_color": "#4f46e5",
+          "text_primary": "#1e293b",
+          "text_secondary": "#64748b",
+          "text_muted": "#94a3b8"
+        },
+        "typography": {
+          "ui": { "font_family": "Inter", "fallback": "-apple-system, BlinkMacSystemFont, sans-serif", "weights": [400, 500, 600, 700], "sizes": { "nav_link": "0.875rem/500", "category_title": "0.75rem/600", "item_title": "0.875rem/500", "item_desc": "0.75rem/400", "featured_title": "0.9375rem/600", "featured_desc": "0.8125rem/400", "cta_button": "0.875rem/600" } },
+          "logo": { "font_family": "'Plus Jakarta Sans' or 'Inter'", "weight": 700, "size": "1.25rem", "letter_spacing": "-0.02em" }
+        },
+        "spacing": {
+          "nav_height": "72px", "nav_padding_x": "32px", "nav_gap": "32px",
+          "dropdown_min_width": "600px", "dropdown_max_width": "800px",
+          "dropdown_padding": "24px", "column_gap": "32px", "item_gap": "4px",
+          "icon_size": "20px", "icon_container_size": "40px",
+          "dropdown_offset": "12px from nav bottom",
+          "cta_gap": "12px", "cta_padding_x": "20px", "cta_padding_y": "10px",
+          "divider_margin": "16px 0"
+        },
+        "accessibility": {
+          "wcag_level": "AA",
+          "keyboard": "Escape closes dropdown, ArrowDown/Up navigates items, Enter/ Space activates, ArrowRight/Left switches dropdowns",
+          "aria": "aria-expanded on nav buttons, aria-controls links dropdown, role='navigation' with aria-label, role='menubar' / 'menuitem' pattern",
+          "focus_trap": "focus is trapped within open dropdown, returning to trigger on close",
+          "hover_behavior": "300ms open delay to prevent accidental opens, 300ms close delay with keep-open-on-hover-menu",
+          "touch": "tap outside closes dropdown, first tap opens (no hover on mobile)"
+        },
+        "performance": {
+          "lazy_dropdown": "render dropdown content only when triggered (or pre-render hidden with visibility for instant open)",
+          "icon_sprites": "inline SVG icons or sprite sheet, no icon library bundle",
+          "event_listeners": "delegate events to nav container, not individual items"
+        },
+        "responsive": {
+          "breakpoints": { "desktop": "1024px+", "tablet": "768px–1023px", "mobile": "<768px" },
+          "desktop": "full mega-menu as designed",
+          "tablet": "mega-menu collapses to single-column stacked layout within dropdown, remove featured section",
+          "mobile": "full hamburger drawer with accordion-style expandable sections, CTAs at bottom of drawer",
+          "touch_targets": "minimum 44px height for all mobile nav items"
+        },
+        "animation": {
+          "dropdown_open": "fade-in + translateY(-8px) → translateY(0), 0.2s ease, with opacity transition",
+          "dropdown_close": "fade-out + slight translateY, 0.15s ease",
+          "hamburger": "lines animate to X, 0.3s ease",
+          "accordion_expand": "max-height transition 0.3s ease",
+          "icon_rotate": "chevron rotates 180° on open, 0.2s",
+          "overlay": "backdrop fade-in 0.2s for mobile drawer"
+        }
+      },
+      "tags": ["navigation", "mega-menu", "saas", "developer-tools", "accessibility", "responsive"],
+      "should_trigger": true,
+      "priority": "P1",
+      "files": []
+    }
+  ]
+}

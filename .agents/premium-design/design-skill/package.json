@@ -1,0 +1,51 @@
+{
+  "name": "design-skill",
+  "version": "2.0.0",
+  "description": "Premium Design Skill Installer - Installs Figma-informed design best practices as an AI agent skill",
+  "author": {
+    "name": "Skills Contributors",
+    "url": "https://github.com/skills/design-skill"
+  },
+  "bin": {
+    "design-skill": "install.js"
+  },
+  "scripts": {
+    "install": "node install.js",
+    "postinstall": "node install.js --postinstall",
+    "dry-run": "node install.js --dry-run --verbose"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/skills/design-skill.git"
+  },
+  "bugs": {
+    "url": "https://github.com/skills/design-skill/issues"
+  },
+  "homepage": "https://github.com/skills/design-skill#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "install.js",
+    "premium-design.skill"
+  ],
+  "keywords": [
+    "design",
+    "UI",
+    "UX",
+    "figma",
+    "premium",
+    "skill",
+    "agent",
+    "design-system",
+    "typography",
+    "color-theory",
+    "design-tokens",
+    "visual-design",
+    "css",
+    "opencode",
+    "claude",
+    "codex"
+  ],
+  "license": "MIT"
+}

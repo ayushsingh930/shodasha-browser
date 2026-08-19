@@ -5,6 +5,8 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+.next/
+build/
 
 # Environment / secrets
 .env
