@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { Bookmark, HistoryEntry } from '@shodasha/core';
+import type { Bookmark, DownloadItem, HistoryEntry } from '@shodasha/core';
 import {
   BOOKMARKS_URL,
+  DOWNLOADS_URL,
   HISTORY_URL,
   PRIVACY_CENTER_URL,
   bookmarkForUrl,
+  downloadSourceFor,
+  downloadStateView,
+  formatDownloadBytes,
   groupHistoryByDate,
   historyDateGroupFor,
   internalPageInfoFor,
@@ -12,6 +16,7 @@ import {
   isInternalPageUrl,
   protectionStatusFor,
   searchBookmarks,
+  searchDownloads,
   searchHistory,
   sortBookmarks,
   type ShieldPanelState,
@@ -85,9 +90,18 @@ describe('internalPageInfoFor', () => {
     });
   });
 
+  it('describes the Downloads Manager', () => {
+    expect(internalPageInfoFor(DOWNLOADS_URL)).toEqual({
+      url: 'shodasha://downloads',
+      kind: 'downloads',
+      title: 'Downloads',
+    });
+  });
+
   it('is case- and whitespace-insensitive', () => {
     expect(internalPageInfoFor(' SHODASHA://BOOKMARKS ')?.kind).toBe('bookmarks');
     expect(internalPageInfoFor(' SHODASHA://HISTORY ')?.kind).toBe('history');
+    expect(internalPageInfoFor(' SHODASHA://DOWNLOADS ')?.kind).toBe('downloads');
   });
 
   it('returns null for non-internal URLs', () => {
@@ -350,5 +364,79 @@ describe('bookmarkForUrl', () => {
   it('returns null when there is no match', () => {
     expect(bookmarkForUrl(bookmarks, 'https://example.net')).toBeNull();
     expect(bookmarkForUrl(bookmarks, '')).toBeNull();
+  });
+});
+
+function downloadItem(overrides: Partial<DownloadItem>): DownloadItem {
+  return {
+    id: 'dl_1',
+    url: 'https://example.com/file.pdf',
+    filename: 'file.pdf',
+    savePath: 'C:/downloads/file.pdf',
+    state: 'completed',
+    receivedBytes: 100,
+    totalBytes: 100,
+    startedAt: 1,
+    completedAt: 2,
+    error: null,
+    mimeType: 'application/pdf',
+    executable: false,
+    ...overrides,
+  };
+}
+
+describe('searchDownloads', () => {
+  const items = [
+    downloadItem({ filename: 'manual.pdf', url: 'https://example.com/manual.pdf' }),
+    downloadItem({ filename: 'photo.jpg', url: 'https://photos.example.net/x.jpg' }),
+  ];
+
+  it('returns everything for an empty query', () => {
+    expect(searchDownloads(items, '')).toHaveLength(2);
+    expect(searchDownloads(items, '  ')).toHaveLength(2);
+  });
+
+  it('matches filenames case-insensitively', () => {
+    expect(searchDownloads(items, 'MANUAL')).toHaveLength(1);
+  });
+
+  it('matches source URLs', () => {
+    expect(searchDownloads(items, 'photos.example')).toHaveLength(1);
+  });
+});
+
+describe('downloadSourceFor', () => {
+  it('extracts the hostname from a download URL', () => {
+    expect(downloadSourceFor(downloadItem({}))).toBe('example.com');
+  });
+
+  it('returns null for unparsable URLs', () => {
+    expect(downloadSourceFor(downloadItem({ url: 'not a url' }))).toBeNull();
+  });
+});
+
+describe('formatDownloadBytes', () => {
+  it('formats compactly with trailing zeros stripped', () => {
+    expect(formatDownloadBytes(0)).toBe('0 B');
+    expect(formatDownloadBytes(512)).toBe('512 B');
+    expect(formatDownloadBytes(2048)).toBe('2 KB');
+    expect(formatDownloadBytes(1_048_576)).toBe('1 MB');
+    expect(formatDownloadBytes(1073741824)).toBe('1 GB');
+  });
+
+  it('handles invalid input defensively', () => {
+    expect(formatDownloadBytes(Number.NaN)).toBe('0 B');
+    expect(formatDownloadBytes(-5)).toBe('0 B');
+  });
+});
+
+describe('downloadStateView', () => {
+  it('maps every state to a label and class', () => {
+    expect(downloadStateView('pending').label).toBe('Pending');
+    expect(downloadStateView('progressing').label).toBe('Downloading');
+    expect(downloadStateView('paused').label).toBe('Paused');
+    expect(downloadStateView('completed').label).toBe('Completed');
+    expect(downloadStateView('cancelled').label).toBe('Cancelled');
+    expect(downloadStateView('failed').label).toBe('Failed');
   });
 });

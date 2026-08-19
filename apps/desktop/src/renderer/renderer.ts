@@ -11,18 +11,24 @@
 
 import {
   BOOKMARKS_URL,
+  DOWNLOADS_URL,
   HISTORY_URL,
   PRIVACY_CENTER_URL,
   bookmarkForUrl,
+  downloadSourceFor,
+  downloadStateView,
+  formatDownloadBytes,
   groupHistoryByDate,
   hostnameFromHistoryUrl,
   internalPageInfoFor,
   isBlankTabUrl,
   searchBookmarks,
+  searchDownloads,
   searchHistory,
   sortBookmarks,
   type BookmarkState,
   type BrowserState,
+  type DownloadsState,
   type HistoryState,
   type PrivacyCenterState,
   type ShieldPanelState,
@@ -39,6 +45,7 @@ import type {
   BookmarkCollection,
   BookmarkFolder,
   BookmarkSort,
+  DownloadItem,
   HistoryEntry,
   ShieldFilterEvent,
   ShieldMode,
@@ -121,6 +128,20 @@ interface ShodashaBridge {
     clearRange(start: number, end: number): Promise<number>;
     clearSite(site: string): Promise<number>;
     onStateChanged(callback: (state: HistoryState) => void): () => void;
+  };
+  downloads: {
+    getState(): Promise<DownloadsState>;
+    pause(id: string): Promise<boolean>;
+    resume(id: string): Promise<boolean>;
+    cancel(id: string): Promise<boolean>;
+    remove(id: string): Promise<boolean>;
+    clear(target: string): Promise<number>;
+    open(id: string): Promise<{ ok: boolean }>;
+    show(id: string): Promise<boolean>;
+    onStateChanged(callback: (state: DownloadsState) => void): () => void;
+    onCompleted(
+      callback: (info: { id: string; filename: string }) => void,
+    ): () => void;
   };
 }
 
@@ -245,6 +266,15 @@ const historyClearRanges = document.querySelectorAll<HTMLInputElement>(
   'input[name="history-clear-range"]',
 );
 
+// Downloads Manager elements.
+const downloadsButton = document.querySelector<HTMLButtonElement>('#btn-downloads');
+const downloadsBadge = document.querySelector<HTMLElement>('#downloads-badge');
+const downloadsManager = document.querySelector<HTMLElement>('#downloads-manager');
+const downloadsManagerSearch = document.querySelector<HTMLInputElement>('#downloads-manager-search');
+const downloadsManagerClear = document.querySelector<HTMLButtonElement>('#downloads-manager-clear');
+const downloadsManagerEmpty = document.querySelector<HTMLElement>('#downloads-manager-empty');
+const downloadsManagerList = document.querySelector<HTMLElement>('#downloads-manager-list');
+
 // ----------------------------------------------------------------------
 // Constants
 // ----------------------------------------------------------------------
@@ -273,6 +303,7 @@ const shieldBridge = window.shodasha?.shield;
 const privacyBridge = window.shodasha?.privacy;
 const bookmarksBridge = window.shodasha?.bookmarks;
 const historyBridge = window.shodasha?.history;
+const downloadsBridge = window.shodasha?.downloads;
 let privacyCenterActive = false;
 let privacyUnsub: (() => void) | null = null;
 let privacyState: PrivacyCenterState | null = null;
@@ -298,6 +329,13 @@ let historyShownCount = HISTORY_PAGE_SIZE;
 let historyMenuEntry: HistoryEntry | null = null;
 /** The selected time range in the clear-history dialog. */
 let historyClearSelection: HistoryClearRange = 'all';
+
+// Downloads state (single source of truth lives in the main process).
+let downloadsState: DownloadsState | null = null;
+let downloadsManagerActive = false;
+/** Whether the Downloads Manager was active in the previous render pass. */
+let downloadsWasActive = false;
+let downloadsSearchQuery = '';
 
 // ----------------------------------------------------------------------
 // Toolbar rendering
@@ -518,6 +556,27 @@ function renderContent(state: BrowserState): void {
     }
   }
 
+  // The Downloads Manager is chrome-rendered, like the History Manager.
+  downloadsManagerActive = internalInfo?.kind === 'downloads';
+  if (downloadsManager !== null) {
+    if (downloadsManagerActive) {
+      if (!downloadsWasActive) {
+        downloadsWasActive = true;
+        if (downloadsSearchQuery.length > 0) {
+          downloadsSearchQuery = '';
+          if (downloadsManagerSearch !== null) {
+            downloadsManagerSearch.value = '';
+          }
+        }
+      }
+      downloadsManager.removeAttribute('hidden');
+      renderDownloadsManager();
+    } else {
+      downloadsWasActive = false;
+      downloadsManager.setAttribute('hidden', '');
+    }
+  }
+
   if (active === null) {
     contentFrame.classList.add('empty');
     contentFrame.replaceChildren();
@@ -629,6 +688,9 @@ function dispatchShortcut(action: ShortcutAction): void {
       break;
     case 'open-history':
       openHistoryManager();
+      break;
+    case 'open-downloads':
+      openDownloadsManager();
       break;
   }
 }
@@ -742,6 +804,9 @@ function handleMenuAction(action: string): void {
       break;
     case 'history':
       openHistoryManager();
+      break;
+    case 'downloads':
+      openDownloadsManager();
       break;
   }
   const menu = document.querySelector<HTMLElement>('#menu');
@@ -1040,6 +1105,12 @@ function openBookmarksManager(): void {
 function openHistoryManager(): void {
   closeShieldPanels();
   void bridge?.submitAddress(HISTORY_URL);
+}
+
+/** Navigates the active tab to the SHODASHA Downloads Manager. */
+function openDownloadsManager(): void {
+  closeShieldPanels();
+  void bridge?.submitAddress(DOWNLOADS_URL);
 }
 
 // ----------------------------------------------------------------------
@@ -1896,6 +1967,243 @@ function attachHistoryHandlers(): void {
   });
 }
 
+// ----------------------------------------------------------------------
+// Downloads Manager
+// ----------------------------------------------------------------------
+
+/** Applies download state pushed from the main process. */
+function applyDownloadsState(state: DownloadsState): void {
+  downloadsState = state;
+  renderDownloadsBadge();
+  if (downloadsManagerActive) {
+    renderDownloadsManager();
+  }
+}
+
+/** Renders the toolbar Downloads badge with the active download count. */
+function renderDownloadsBadge(): void {
+  if (downloadsBadge === null) {
+    return;
+  }
+  const items = downloadsState?.items ?? [];
+  const active = items.filter(
+    (item) =>
+      item.state === 'pending' ||
+      item.state === 'progressing' ||
+      item.state === 'paused',
+  ).length;
+  if (active === 0) {
+    downloadsBadge.hidden = true;
+    downloadsBadge.textContent = '';
+    return;
+  }
+  downloadsBadge.hidden = false;
+  downloadsBadge.textContent = active > 99 ? '99+' : String(active);
+}
+
+function renderDownloadsManager(): void {
+  if (downloadsManagerList === null || downloadsManagerEmpty === null) {
+    return;
+  }
+  const items = searchDownloads(
+    downloadsState?.items ?? [],
+    downloadsSearchQuery,
+  );
+  if (items.length === 0) {
+    downloadsManagerEmpty.hidden = false;
+    downloadsManagerList.replaceChildren();
+    return;
+  }
+  downloadsManagerEmpty.hidden = true;
+  const fragment = document.createDocumentFragment();
+  for (const item of items) {
+    fragment.appendChild(buildDownloadItem(item));
+  }
+  downloadsManagerList.replaceChildren(fragment);
+}
+
+function buildDownloadItem(item: DownloadItem): HTMLElement {
+  const li = document.createElement('li');
+  li.className = `downloads-manager-item ${downloadStateView(item.state).className}`;
+  li.dataset.downloadId = item.id;
+
+  const main = document.createElement('div');
+  main.className = 'downloads-manager-item-main';
+
+  const filename = document.createElement('span');
+  filename.className = 'downloads-manager-item-filename';
+  filename.textContent = item.filename;
+  filename.title = item.filename;
+
+  const meta = document.createElement('span');
+  meta.className = 'downloads-manager-item-meta';
+  const source = downloadSourceFor(item);
+  const size = formatDownloadSize(item);
+  const stateLabel = downloadStateView(item.state).label;
+  const parts: string[] = [stateLabel];
+  if (source !== null) {
+    parts.push(source);
+  }
+  if (size !== null) {
+    parts.push(size);
+  }
+  if (item.executable) {
+    parts.push('Executable file');
+  }
+  meta.textContent = parts.join(' \u00b7 ');
+
+  main.append(filename, meta);
+
+  // Live progress for active downloads.
+  const progress =
+    item.state === 'progressing' ||
+    item.state === 'pending' ||
+    item.state === 'paused';
+  const progressBar = document.createElement('div');
+  progressBar.className = 'downloads-progress';
+  progressBar.hidden = !progress;
+  const track = document.createElement('div');
+  track.className = 'downloads-progress-track';
+  const fill = document.createElement('div');
+  fill.className = 'downloads-progress-fill';
+  if (item.totalBytes > 0 && item.totalBytes >= item.receivedBytes) {
+    const pct = Math.round((item.receivedBytes / item.totalBytes) * 100);
+    fill.style.width = `${String(pct)}%`;
+    fill.setAttribute('aria-valuenow', String(pct));
+  } else {
+    fill.style.width = '0%';
+    fill.setAttribute('aria-valuenow', '0');
+  }
+  track.setAttribute('role', 'progressbar');
+  track.setAttribute('aria-label', `Progress for ${item.filename}`);
+  track.appendChild(fill);
+  progressBar.appendChild(track);
+  li.appendChild(progressBar);
+
+  // Error note for failed downloads.
+  if (item.state === 'failed' && item.error !== null) {
+    const error = document.createElement('span');
+    error.className = 'downloads-manager-item-error';
+    error.textContent = item.error;
+    li.appendChild(error);
+  }
+
+  const actions = document.createElement('div');
+  actions.className = 'downloads-manager-item-actions';
+
+  if (item.state === 'progressing' || item.state === 'pending') {
+    actions.appendChild(
+      buildDownloadAction('Pause', () => {
+        void downloadsBridge?.pause(item.id);
+      }),
+    );
+    actions.appendChild(
+      buildDownloadAction('Cancel', () => {
+        void downloadsBridge?.cancel(item.id);
+      }),
+    );
+  } else if (item.state === 'paused') {
+    actions.appendChild(
+      buildDownloadAction('Resume', () => {
+        void downloadsBridge?.resume(item.id);
+      }),
+    );
+    actions.appendChild(
+      buildDownloadAction('Cancel', () => {
+        void downloadsBridge?.cancel(item.id);
+      }),
+    );
+  } else if (item.state === 'completed') {
+    actions.appendChild(
+      buildDownloadAction('Open', () => {
+        void downloadsBridge?.open(item.id);
+      }),
+    );
+    actions.appendChild(
+      buildDownloadAction('Show in Folder', () => {
+        void downloadsBridge?.show(item.id);
+      }),
+    );
+    actions.appendChild(
+      buildDownloadAction('Remove', () => {
+        void downloadsBridge?.remove(item.id);
+      }),
+    );
+  } else {
+    actions.appendChild(
+      buildDownloadAction('Remove', () => {
+        void downloadsBridge?.remove(item.id);
+      }),
+    );
+  }
+
+  li.append(main, actions);
+  return li;
+}
+
+function buildDownloadAction(label: string, onClick: () => void): HTMLElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'privacy-btn privacy-btn-ghost';
+  button.textContent = label;
+  button.addEventListener('click', onClick);
+  return button;
+}
+
+/** A human-readable size summary, or null when no size is meaningful. */
+function formatDownloadSize(item: DownloadItem): string | null {
+  if (item.totalBytes > 0) {
+    if (item.totalBytes >= item.receivedBytes) {
+      return `${formatDownloadBytes(item.receivedBytes)} / ${formatDownloadBytes(item.totalBytes)}`;
+    }
+    return formatDownloadBytes(item.totalBytes);
+  }
+  if (item.receivedBytes > 0) {
+    // The server did not announce a total; show honest "downloaded so far".
+    return `${formatDownloadBytes(item.receivedBytes)} downloaded`;
+  }
+  return null;
+}
+
+/** Shows a subtle in-browser notice when a download completes. */
+function showDownloadToast(info: { id: string; filename: string }): void {
+  const toast = document.createElement('div');
+  toast.className = 'download-toast';
+  const icon = document.createElement('span');
+  icon.className = 'download-toast-icon';
+  icon.textContent = '\u2713';
+  const text = document.createElement('span');
+  text.className = 'download-toast-text';
+  text.textContent = `Download complete: ${info.filename}`;
+  const open = document.createElement('button');
+  open.type = 'button';
+  open.className = 'download-toast-action';
+  open.textContent = 'Open';
+  open.addEventListener('click', () => {
+    void downloadsBridge?.open(info.id);
+    toast.remove();
+  });
+  toast.append(icon, text, open);
+  document.body.appendChild(toast);
+  window.setTimeout(() => {
+    toast.classList.add('leaving');
+    window.setTimeout(() => {
+      toast.remove();
+    }, 300);
+  }, 6000);
+}
+
+function attachDownloadsHandlers(): void {
+  downloadsButton?.addEventListener('click', openDownloadsManager);
+  downloadsManagerSearch?.addEventListener('input', () => {
+    downloadsSearchQuery = downloadsManagerSearch.value;
+    renderDownloadsManager();
+  });
+  downloadsManagerClear?.addEventListener('click', () => {
+    void downloadsBridge?.clear('all');
+  });
+}
+
 function attachPrivacyCenterHandlers(): void {
   privacyGlobalToggle?.addEventListener('click', () => {
     const panel = privacyState?.panel;
@@ -2286,6 +2594,7 @@ async function boot(): Promise<void> {
   attachPrivacyCenterHandlers();
   attachBookmarkHandlers();
   attachHistoryHandlers();
+  attachDownloadsHandlers();
 
   if (bridge === undefined) {
     const root = document.querySelector<HTMLElement>('#app');
@@ -2318,6 +2627,16 @@ async function boot(): Promise<void> {
   const historyInitial = await historyBridge?.getState();
   if (historyInitial !== undefined) {
     applyHistoryState(historyInitial);
+  }
+
+  // Downloads: a single subscription keeps the badge and the Downloads
+  // Manager in sync. The main process pushes immediately for state changes
+  // and throttles high-frequency progress updates.
+  downloadsBridge?.onStateChanged(applyDownloadsState);
+  downloadsBridge?.onCompleted(showDownloadToast);
+  const downloadsInitial = await downloadsBridge?.getState();
+  if (downloadsInitial !== undefined) {
+    applyDownloadsState(downloadsInitial);
   }
 }
 

@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { Logger, TabManager } from '@shodasha/core';
 import { BookmarkCoordinator } from './bookmarkCoordinator.js';
 import { BrowserController } from './browserController.js';
+import { DownloadCoordinator } from './downloadCoordinator.js';
 import { HistoryCoordinator } from './historyCoordinator.js';
 import { ShieldCoordinator } from './shieldCoordinator.js';
 import { ShieldSettingsStore } from './settingsStore.js';
@@ -25,6 +26,7 @@ let shield: ShieldCoordinator | null = null;
 let settingsStore: ShieldSettingsStore | null = null;
 let bookmarks: BookmarkCoordinator | null = null;
 let history: HistoryCoordinator | null = null;
+let downloads: DownloadCoordinator | null = null;
 
 /**
  * Hardened WebPreferences for the chrome UI. Context isolation is on, node
@@ -102,6 +104,15 @@ function createMainWindow(): BrowserWindow {
   });
   bookmarks.attachManager(manager);
 
+  downloads ??= new DownloadCoordinator({
+    chrome: win.webContents,
+    session: win.webContents.session,
+    file: path.join(app.getPath('userData'), 'downloads.json'),
+    ...(process.env.SHODASHA_DOWNLOADS_DIR
+      ? { downloadsDir: process.env.SHODASHA_DOWNLOADS_DIR }
+      : {}),
+  });
+
   // Tear down tab views while the window is still valid ('close' fires before
   // destruction). dispose() is idempotent, so the 'closed' fallback stays safe.
   win.on('close', () => {
@@ -126,11 +137,12 @@ void app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
-  // Flush any debounced Shield settings, bookmark, and history writes so saved
-  // data survives.
+  // Flush any debounced Shield settings, bookmark, history, and download writes
+  // so saved data survives.
   settingsStore?.flush();
   bookmarks?.dispose();
   history?.dispose();
+  downloads?.dispose();
 });
 
 app.on('window-all-closed', () => {

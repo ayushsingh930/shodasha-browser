@@ -10,6 +10,7 @@ import type {
   Bookmark,
   BookmarkCollection,
   BookmarkSort,
+  DownloadItem,
   FilterListStatus,
   HistoryDateGroup,
   HistoryEntry,
@@ -86,8 +87,11 @@ export const BOOKMARKS_URL = 'shodasha://bookmarks';
 /** The internal URL of the SHODASHA History Manager. */
 export const HISTORY_URL = 'shodasha://history';
 
+/** The internal URL of the SHODASHA Downloads Manager. */
+export const DOWNLOADS_URL = 'shodasha://downloads';
+
 /** The kinds of internal pages the chrome UI can render. */
-export type InternalPageKind = 'privacy' | 'bookmarks' | 'history';
+export type InternalPageKind = 'privacy' | 'bookmarks' | 'history' | 'downloads';
 
 /** Metadata for a SHODASHA internal page. */
 export interface InternalPageInfo {
@@ -112,6 +116,9 @@ export function internalPageInfoFor(url: string): InternalPageInfo | null {
   }
   if (normalized === HISTORY_URL) {
     return { url: HISTORY_URL, kind: 'history', title: 'History' };
+  }
+  if (normalized === DOWNLOADS_URL) {
+    return { url: DOWNLOADS_URL, kind: 'downloads', title: 'Downloads' };
   }
   return null;
 }
@@ -414,7 +421,97 @@ export function bookmarkForUrl(
   return bookmarks.find((bookmark) => bookmarkKeyForUrl(bookmark.url) === key) ?? null;
 }
 
-/** IPC channel names used between renderer and main. */
+// ---------------------------------------------------------------------
+// Downloads (renderer-reachable pure helpers)
+//
+// The chrome renderer runs as a plain browser ES module and cannot import
+// `@shodasha/core` at runtime. These helpers mirror the authoritative core
+// logic so the Downloads Manager can search and format locally, on this
+// device, with no remote service.
+// ---------------------------------------------------------------------
+
+/**
+ * The full download state pushed to the UI. It mirrors the single source of
+ * truth in the main process (the core DownloadManager), newest first.
+ */
+export interface DownloadsState {
+  readonly items: readonly DownloadItem[];
+}
+
+/** Case-insensitive local search across download filename and source URL. */
+export function searchDownloads(
+  items: readonly DownloadItem[],
+  query: string,
+): DownloadItem[] {
+  const needle = query.trim().toLowerCase();
+  if (needle.length === 0) {
+    return [...items];
+  }
+  return items.filter((item) => {
+    return (
+      item.filename.toLowerCase().includes(needle) ||
+      item.url.toLowerCase().includes(needle)
+    );
+  });
+}
+
+/** The hostname a download was fetched from, for display. */
+export function downloadSourceFor(item: DownloadItem): string | null {
+  try {
+    const hostname = new URL(item.url).hostname.toLowerCase();
+    return hostname.length === 0 ? null : hostname;
+  } catch {
+    return null;
+  }
+}
+
+/** Formats a byte count into a compact human-readable string. */
+export function formatDownloadBytes(bytes: number): string {
+  const value = typeof bytes === 'number' && Number.isFinite(bytes) ? bytes : 0;
+  if (value < 1024) {
+    const whole = Math.max(0, Math.floor(value));
+    return String(whole).concat(' B');
+  }
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let amount = value;
+  let unit = 'B';
+  for (const next of units) {
+    if (amount < 1024) {
+      break;
+    }
+    amount /= 1024;
+    unit = next;
+  }
+  const digits = amount >= 100 ? 0 : amount >= 10 ? 1 : 2;
+  const text = amount.toFixed(digits).replace(/\.?0+$/, '');
+  return `${text} ${unit}`;
+}
+
+/**
+ * The user-facing label and CSS class for a download state. Terminal states
+ * are static; active states update live as progress arrives.
+ */
+export function downloadStateView(state: DownloadItem['state']): {
+  label: string;
+  className: string;
+} {
+  switch (state) {
+    case 'pending':
+      return { label: 'Pending', className: 'download-state-pending' };
+    case 'progressing':
+      return { label: 'Downloading', className: 'download-state-progressing' };
+    case 'paused':
+      return { label: 'Paused', className: 'download-state-paused' };
+    case 'completed':
+      return { label: 'Completed', className: 'download-state-completed' };
+    case 'cancelled':
+      return { label: 'Cancelled', className: 'download-state-cancelled' };
+    case 'failed':
+      return { label: 'Failed', className: 'download-state-failed' };
+  }
+}
+
+/** The IPC channel names used between renderer and main. */
 export const IPC = {
   getState: 'browser:get-state',
   submitAddress: 'browser:submit-address',
@@ -467,4 +564,14 @@ export const IPC = {
   historyClear: 'history:clear',
   historyClearRange: 'history:clear-range',
   historyClearSite: 'history:clear-site',
+  downloadsGetState: 'downloads:get-state',
+  downloadsStateChanged: 'downloads:state-changed',
+  downloadsPause: 'downloads:pause',
+  downloadsResume: 'downloads:resume',
+  downloadsCancel: 'downloads:cancel',
+  downloadsRemove: 'downloads:remove',
+  downloadsClear: 'downloads:clear',
+  downloadsOpen: 'downloads:open',
+  downloadsShow: 'downloads:show',
+  downloadsCompleted: 'downloads:completed',
 } as const;

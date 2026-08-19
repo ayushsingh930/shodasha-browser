@@ -25,6 +25,7 @@ import type { NavigationError } from '@shodasha/core';
 import {
   IPC,
   HISTORY_URL,
+  DOWNLOADS_URL,
   internalPageInfoFor,
   isBlankTabUrl,
   isInternalPageUrl,
@@ -482,6 +483,9 @@ export class BrowserController {
       case 'open-history':
         this.openHistoryPage();
         break;
+      case 'open-downloads':
+        this.openDownloadsPage();
+        break;
     }
   }
 
@@ -499,6 +503,15 @@ export class BrowserController {
       return;
     }
     this.navigateInternal(active.id, HISTORY_URL);
+  }
+
+  /** Opens the SHODASHA Downloads Manager in the active tab (Ctrl+J). */
+  private openDownloadsPage(): void {
+    const active = this.manager.activeTab;
+    if (active === null) {
+      return;
+    }
+    this.navigateInternal(active.id, DOWNLOADS_URL);
   }
 
   /**

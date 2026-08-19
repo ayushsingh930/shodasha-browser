@@ -1932,6 +1932,309 @@ body {
   border: 0;
 }
 
+/* -------------------------------------------------------------- downloads */
+
+.downloads-button-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.downloads-button {
+  color: var(--muted);
+}
+
+.downloads-button:hover {
+  color: var(--fg);
+}
+
+.downloads-icon {
+  display: block;
+}
+
+.downloads-badge {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--brand);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.downloads-manager {
+  position: absolute;
+  top: var(--chrome-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  overflow-y: auto;
+  background: var(--bg-chrome);
+}
+
+.downloads-manager[hidden] {
+  display: none;
+}
+
+.downloads-manager-inner {
+  width: min(860px, 94%);
+  margin: 0 auto;
+  padding: 28px 0 48px;
+}
+
+.downloads-manager-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.downloads-manager-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.downloads-manager-subtitle {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.downloads-manager-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.downloads-manager-controls input {
+  height: 30px;
+  min-width: 180px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12px;
+  outline: none;
+}
+
+.downloads-manager-controls input:focus-visible {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+.downloads-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 48px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.downloads-empty-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.downloads-empty-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.downloads-manager-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.downloads-manager-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.downloads-manager-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.downloads-manager-item-filename {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.downloads-manager-item-meta {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.downloads-manager-item-error {
+  font-size: 12px;
+  color: var(--danger, #b3261e);
+}
+
+.downloads-manager-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.downloads-progress {
+  display: flex;
+}
+
+.downloads-progress[hidden] {
+  display: none;
+}
+
+.downloads-progress-track {
+  flex: 1 1 auto;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--brand-soft);
+  overflow: hidden;
+}
+
+.downloads-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--brand);
+  transition: width 0.25s ease;
+}
+
+/* Per-state tint so active vs finished downloads are obvious at a glance. */
+.downloads-manager-item.download-state-progressing,
+.downloads-manager-item.download-state-pending,
+.downloads-manager-item.download-state-paused {
+  border-color: var(--brand-soft);
+}
+
+.downloads-manager-item.download-state-completed {
+  border-color: var(--success, #1a7f37);
+}
+
+.downloads-manager-item.download-state-failed {
+  border-color: var(--danger, #b3261e);
+}
+
+.downloads-manager-item.download-state-cancelled {
+  border-color: var(--border);
+}
+
+/* -------------------------------------------------------- download toast */
+
+.download-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(360px, 92vw);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(30, 27, 46, 0.24);
+  animation: download-toast-in 0.25s ease;
+}
+
+.download-toast.leaving {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+@keyframes download-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.download-toast-icon {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--success, #1a7f37);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.download-toast-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-toast-action {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.download-toast-action:hover {
+  background: var(--brand-soft);
+}
+
+.download-toast-action:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
 /* ----------------------------------------------------------- accessibility */
 
 .icon-button:focus-visible,
@@ -1949,6 +2252,9 @@ body {
 .history-manager-more:focus-visible,
 .history-more:focus-visible,
 .history-clear-range:focus-within,
+.downloads-manager-controls input:focus-visible,
+.downloads-button:focus-visible,
+.downloads-badge:focus-visible,
 .tab-close:focus-visible,
 .menu button:focus-visible,
 .context-menu button:focus-visible,
@@ -2005,6 +2311,10 @@ body {
   }
 
   .history-manager-header {
+    flex-direction: column;
+  }
+
+  .downloads-manager-header {
     flex-direction: column;
   }
 

@@ -61,6 +61,16 @@ const IPC = {
   historyClear: 'history:clear',
   historyClearRange: 'history:clear-range',
   historyClearSite: 'history:clear-site',
+  downloadsGetState: 'downloads:get-state',
+  downloadsStateChanged: 'downloads:state-changed',
+  downloadsPause: 'downloads:pause',
+  downloadsResume: 'downloads:resume',
+  downloadsCancel: 'downloads:cancel',
+  downloadsRemove: 'downloads:remove',
+  downloadsClear: 'downloads:clear',
+  downloadsOpen: 'downloads:open',
+  downloadsShow: 'downloads:show',
+  downloadsCompleted: 'downloads:completed',
 };
 
 function subscribe(channel, callback) {
@@ -143,5 +153,17 @@ contextBridge.exposeInMainWorld('shodasha', {
       ipcRenderer.invoke(IPC.historyClearRange, { start, end }),
     clearSite: (site) => ipcRenderer.invoke(IPC.historyClearSite, site),
     onStateChanged: (callback) => subscribe(IPC.historyStateChanged, callback),
+  },
+  downloads: {
+    getState: () => ipcRenderer.invoke(IPC.downloadsGetState),
+    pause: (id) => ipcRenderer.invoke(IPC.downloadsPause, id),
+    resume: (id) => ipcRenderer.invoke(IPC.downloadsResume, id),
+    cancel: (id) => ipcRenderer.invoke(IPC.downloadsCancel, id),
+    remove: (id) => ipcRenderer.invoke(IPC.downloadsRemove, id),
+    clear: (target) => ipcRenderer.invoke(IPC.downloadsClear, target),
+    open: (id) => ipcRenderer.invoke(IPC.downloadsOpen, id),
+    show: (id) => ipcRenderer.invoke(IPC.downloadsShow, id),
+    onStateChanged: (callback) => subscribe(IPC.downloadsStateChanged, callback),
+    onCompleted: (callback) => subscribe(IPC.downloadsCompleted, callback),
   },
 });

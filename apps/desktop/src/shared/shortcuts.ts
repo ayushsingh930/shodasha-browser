@@ -21,7 +21,8 @@ export type ShortcutAction =
   | 'reload'
   | 'hard-reload'
   | 'toggle-bookmarks-bar'
-  | 'open-history';
+  | 'open-history'
+  | 'open-downloads';
 
 /** A normalized view of a key event (shared across Electron and DOM). */
 export interface ShortcutInput {
@@ -74,6 +75,9 @@ export function shortcutActionFor(input: ShortcutInput): ShortcutAction | null {
     }
     if (key === 'h' && !input.shift) {
       return 'open-history';
+    }
+    if (key === 'j' && !input.shift) {
+      return 'open-downloads';
     }
     return null;
   }

@@ -106,6 +106,32 @@
           >
             +
           </button>
+          <div class="downloads-button-wrap">
+            <button
+              id="btn-downloads"
+              class="icon-button downloads-button"
+              title="Downloads"
+              aria-label="Downloads"
+            >
+              <svg
+                class="downloads-icon"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </button>
+            <span id="downloads-badge" class="downloads-badge" hidden aria-hidden="true">0</span>
+          </div>
           <button
             id="btn-menu"
             class="icon-button"
@@ -239,6 +265,7 @@
             <button type="button" data-action="privacy-center">Privacy Center</button>
             <button type="button" data-action="bookmarks">Bookmarks</button>
             <button type="button" data-action="history">History</button>
+            <button type="button" data-action="downloads">Downloads</button>
             <button type="button" data-action="reopen-closed">Reopen closed tab</button>
           </nav>
         </div>
@@ -512,6 +539,40 @@
           <button type="button" id="history-manager-more" class="privacy-btn history-more" hidden>
             Show more
           </button>
+        </div>
+      </section>
+
+      <section id="downloads-manager" class="downloads-manager" hidden aria-label="SHODASHA Downloads Manager">
+        <div class="downloads-manager-inner">
+          <header class="downloads-manager-header">
+            <div>
+              <h1 class="downloads-manager-title">Downloads</h1>
+              <p class="downloads-manager-subtitle">
+                Files are saved to your device's Downloads folder. Download
+                metadata never leaves this device.
+              </p>
+            </div>
+            <div class="downloads-manager-controls">
+              <input
+                id="downloads-manager-search"
+                type="text"
+                placeholder="Search downloads"
+                aria-label="Search downloads"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <button type="button" id="downloads-manager-clear" class="privacy-btn">
+                Clear finished
+              </button>
+            </div>
+          </header>
+
+          <div id="downloads-manager-empty" class="downloads-empty" hidden>
+            <p class="downloads-empty-title">No downloads yet</p>
+            <p class="downloads-empty-note">Files you download will appear here.</p>
+          </div>
+
+          <div id="downloads-manager-list" class="downloads-manager-scroll"></div>
         </div>
       </section>
 

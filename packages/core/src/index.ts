@@ -199,6 +199,38 @@ export type {
   RecordVisitResult,
 } from './history/historyManager.js';
 
+export {
+  createDownloadId,
+  isValidDownloadUrl,
+  sanitizeFilename,
+  uniqueFilename,
+  isExecutableFilename,
+  searchDownloads,
+  formatBytes,
+  DOWNLOAD_COLLECTION_VERSION,
+  MAX_DOWNLOAD_FILENAME_LENGTH,
+  TERMINAL_DOWNLOAD_STATES,
+  ACTIVE_DOWNLOAD_STATES,
+} from './downloads/downloadModel.js';
+export type {
+  DownloadItem,
+  DownloadCollection,
+  DownloadState,
+} from './downloads/downloadModel.js';
+export {
+  parseDownloadCollection,
+  serializeDownloadCollection,
+  emptyDownloadCollection,
+} from './downloads/downloadPersistence.js';
+export {
+  DownloadManager,
+  MAX_DOWNLOAD_RECORDS,
+} from './downloads/downloadManager.js';
+export type {
+  AddDownloadInput,
+  AddDownloadResult,
+} from './downloads/downloadManager.js';
+
 export type {
   KeyValueStore,
   EncryptedStore,
