@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Premium starter template with modern CSS, accessibility, and performance best practices." />
+  <meta name="color-scheme" content="light dark" />
+  <title>Premium Starter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>
+    document.documentElement.classList.remove('no-js');
+    document.documentElement.classList.add('js');
+  </script>
+  <style>
+    /* ================================================================
+       Design Tokens
+       ================================================================ */
+    :root {
+      /* ---- Color tokens (light) ---- */
+      --color-bg-primary: #FFFFFF;
+      --color-bg-secondary: #F8F9FA;
+      --color-text-primary: #1A1A2E;
+      --color-text-secondary: #6B7280;
+      --color-action-primary: #4F46E5;
+      --color-action-hover: #4338CA;
+      --color-action-text: #FFFFFF;
+      --color-border-default: #E5E7EB;
+      --color-success: #10B981;
+      --color-warning: #F59E0B;
+      --color-error: #EF4444;
+      --color-overlay: rgba(0, 0, 0, 0.5);
+      --color-glass-bg: rgba(255, 255, 255, 0.72);
+      --color-glass-border: rgba(255, 255, 255, 0.18);
+
+      /* ---- Color tokens (dark) — set by .dark or prefers-color-scheme ---- */
+      --color-bg-primary-dark: #0F0F1A;
+      --color-bg-secondary-dark: #1A1A2E;
+      --color-text-primary-dark: #F0F0F5;
+      --color-text-secondary-dark: #9898B0;
+      --color-action-primary-dark: #818CF8;
+      --color-action-hover-dark: #6366F1;
+      --color-border-default-dark: #2D2D44;
+      --color-glass-bg-dark: rgba(15, 15, 26, 0.78);
+
+      /* ---- Spacing ---- */
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 32px;
+      --space-2xl: 48px;
+      --space-3xl: 64px;
+      --space-4xl: 96px;
+
+      /* ---- Typography ---- */
+      --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      --text-xs: 0.75rem;
+      --text-sm: 0.875rem;
+      --text-base: 1rem;
+      --text-lg: 1.125rem;
+      --text-xl: 1.25rem;
+      --text-2xl: 1.5rem;
+      --text-3xl: 1.875rem;
+      --text-4xl: 2.25rem;
+      --text-5xl: 3rem;
+      --text-6xl: 3.75rem;
+      --leading-tight: 1.2;
+      --leading-normal: 1.6;
+      --leading-relaxed: 1.75;
+
+      /* ---- Border radius ---- */
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --radius-xl: 16px;
+      --radius-full: 9999px;
+
+      /* ---- Shadows ---- */
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+      --shadow-xl: 0 16px 48px rgba(0,0,0,0.16);
+
+      /* ---- Transitions ---- */
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+      --duration-fast: 150ms;
+      --duration-normal: 250ms;
+      --duration-slow: 400ms;
+
+      /* ---- Layout ---- */
+      --container-max: 1200px;
+      --header-height: 64px;
+    }
+
+    /* ================================================================
+       Dark Mode
+       ================================================================ */
+    @media (prefers-color-scheme: dark) {
+      :root:not(.light) {
+        --color-bg-primary: var(--color-bg-primary-dark);
+        --color-bg-secondary: var(--color-bg-secondary-dark);
+        --color-text-primary: var(--color-text-primary-dark);
+        --color-text-secondary: var(--color-text-secondary-dark);
+        --color-action-primary: var(--color-action-primary-dark);
+        --color-action-hover: var(--color-action-hover-dark);
+        --color-border-default: var(--color-border-default-dark);
+        --color-glass-bg: var(--color-glass-bg-dark);
+      }
+    }
+    :root.dark {
+      --color-bg-primary: var(--color-bg-primary-dark);
+      --color-bg-secondary: var(--color-bg-secondary-dark);
+      --color-text-primary: var(--color-text-primary-dark);
+      --color-text-secondary: var(--color-text-secondary-dark);
+      --color-action-primary: var(--color-action-primary-dark);
+      --color-action-hover: var(--color-action-hover-dark);
+      --color-border-default: var(--color-border-default-dark);
+      --color-glass-bg: var(--color-glass-bg-dark);
+    }
+
+    /* ================================================================
+       Reset & Base
+       ================================================================ */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    body {
+      font-family: var(--font-family);
+      font-size: var(--text-base);
+      color: var(--color-text-primary);
+      background: var(--color-bg-primary);
+      line-height: var(--leading-normal);
+      transition: background-color var(--duration-normal) ease, color var(--duration-normal) ease;
+    }
+
+    img {
+      display: block;
+      max-inline-size: 100%;
+      height: auto;
+    }
+
+    a {
+      color: var(--color-action-primary);
+      transition: color var(--duration-fast) ease;
+    }
+    a:hover { color: var(--color-action-hover); }
+
+    /* ================================================================
+       Utilities
+       ================================================================ */
+    .container {
+      max-inline-size: var(--container-max);
+      margin-inline: auto;
+      padding-inline: clamp(1rem, 5vw, 2rem);
+    }
+
+    .section {
+      padding-block: var(--space-3xl);
+    }
+    @container (max-width: 768px) {
+      .section { padding-block: var(--space-2xl); }
+    }
+    @container (max-width: 480px) {
+      .section { padding-block: var(--space-xl); }
+    }
+
+    .visually-hidden:not(:focus):not(:active) {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .skip-link {
+      position: absolute;
+      inset-block-start: var(--space-sm);
+      inset-inline-start: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--color-action-primary);
+      color: var(--color-action-text);
+      border-radius: var(--radius-sm);
+      z-index: 1000;
+      transform: translateY(-120%);
+      transition: transform var(--duration-fast) var(--ease-out);
+    }
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    /* ================================================================
+       Typography
+       ================================================================ */
+    h1, h2, h3, h4 {
+      line-height: var(--leading-tight);
+      font-weight: 700;
+    }
+    h1 { font-size: var(--text-5xl); letter-spacing: -0.02em; }
+    h2 { font-size: var(--text-3xl); letter-spacing: -0.01em; }
+    h3 { font-size: var(--text-2xl); }
+    h4 { font-size: var(--text-xl); }
+
+    p { color: var(--color-text-secondary); max-inline-size: 65ch; }
+    p + p { margin-block-start: 1.5rem; }
+
+    /* ================================================================
+       Buttons
+       ================================================================ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-sm);
+      padding: 0.75rem 1.5rem;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: var(--text-sm);
+      cursor: pointer;
+      border: none;
+      transition:
+        background var(--duration-fast) ease,
+        color var(--duration-fast) ease,
+        box-shadow var(--duration-fast) ease,
+        transform var(--duration-fast) ease;
+      text-decoration: none;
+      min-block-size: 44px;
+      font-family: inherit;
+      line-height: 1;
+    }
+    .btn-primary {
+      background: var(--color-action-primary);
+      color: var(--color-action-text);
+    }
+    .btn-primary:hover {
+      background: var(--color-action-hover);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:focus-visible {
+      outline: 3px solid var(--color-action-primary);
+      outline-offset: 3px;
+    }
+    .btn-secondary {
+      border: 2px solid var(--color-border-default);
+      background: transparent;
+      color: var(--color-text-primary);
+    }
+    .btn-secondary:hover {
+      border-color: var(--color-action-primary);
+      color: var(--color-action-primary);
+    }
+
+    /* ================================================================
+       Card Component
+       ================================================================ */
+    .card {
+      container-type: inline-size;
+      background: var(--color-bg-primary);
+      border-radius: var(--radius-xl);
+      padding: var(--space-xl);
+      border: 1px solid var(--color-border-default);
+      transition:
+        transform var(--duration-normal) var(--ease-out),
+        box-shadow var(--duration-normal) var(--ease-out);
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+    .card h3 { margin-block-end: var(--space-xs); }
+    .card p  { font-size: var(--text-sm); }
+
+    /* ================================================================
+       Glassmorphism Header (performant)
+       ================================================================ */
+    .site-header {
+      position: sticky;
+      inset-block-start: 0;
+      z-index: 100;
+      background: var(--color-glass-bg);
+      border-block-end: 1px solid var(--color-border-default);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      will-change: transform;
+      block-size: var(--header-height);
+      display: flex;
+      align-items: center;
+    }
+    /* Fallback for browsers that don't support backdrop-filter */
+    @supports not (backdrop-filter: blur(1px)) {
+      .site-header { background: var(--color-bg-primary); }
+    }
+    .site-header .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      inline-size: 100%;
+    }
+    .site-logo {
+      font-weight: 800;
+      font-size: var(--text-xl);
+      color: var(--color-text-primary);
+      text-decoration: none;
+    }
+    .site-nav {
+      display: flex;
+      gap: var(--space-xl);
+      align-items: center;
+    }
+    .site-nav a {
+      text-decoration: none;
+      color: var(--color-text-secondary);
+      font-size: var(--text-sm);
+      font-weight: 500;
+      transition: color var(--duration-fast) ease;
+    }
+    .site-nav a:hover { color: var(--color-text-primary); }
+
+    /* ================================================================
+       Hero
+       ================================================================ */
+    .hero {
+      display: flex;
+      align-items: center;
+      min-block-size: 80vh;
+      text-align: center;
+    }
+    .hero-content {
+      max-inline-size: 720px;
+      margin-inline: auto;
+    }
+    .hero-actions {
+      display: flex;
+      gap: var(--space-md);
+      justify-content: center;
+      margin-block-start: var(--space-xl);
+      flex-wrap: wrap;
+    }
+
+    /* ================================================================
+       Features Grid
+       ================================================================ */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--space-xl);
+    }
+
+    /* ================================================================
+       Testimonials / Marquee
+       ================================================================ */
+    .testimonials {
+      overflow: hidden;
+      position: relative;
+    }
+    .testimonials-track {
+      display: flex;
+      gap: var(--space-xl);
+      animation: marquee 24s linear infinite;
+      inline-size: max-content;
+    }
+    .testimonials:hover .testimonials-track {
+      animation-play-state: paused;
+    }
+    .testimonial-card {
+      flex: 0 0 320px;
+      background: var(--color-bg-primary);
+      border: 1px solid var(--color-border-default);
+      border-radius: var(--radius-xl);
+      padding: var(--space-xl);
+      container-type: inline-size;
+    }
+    .testimonial-card blockquote {
+      font-style: italic;
+      color: var(--color-text-secondary);
+      margin-block-end: var(--space-md);
+    }
+    .testimonial-card cite {
+      font-style: normal;
+      font-weight: 600;
+      font-size: var(--text-sm);
+    }
+
+    @keyframes marquee {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    /* Duplicate track is handled via aria-hidden clone in markup */
+
+    /* ================================================================
+       Newsletter Form
+       ================================================================ */
+    .form-newsletter {
+      display: flex;
+      gap: var(--space-md);
+      flex-wrap: wrap;
+      justify-content: center;
+      max-inline-size: 480px;
+      margin-inline: auto;
+    }
+    .form-newsletter label { inline-size: 100%; }
+    .form-newsletter .input-group {
+      display: flex;
+      gap: var(--space-sm);
+      inline-size: 100%;
+    }
+    .form-newsletter input[type="email"] {
+      flex: 1;
+      min-inline-size: 200px;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--color-border-default);
+      border-radius: var(--radius-md);
+      font-family: inherit;
+      font-size: var(--text-sm);
+      background: var(--color-bg-primary);
+      color: var(--color-text-primary);
+      transition: border-color var(--duration-fast) ease;
+    }
+    .form-newsletter input[type="email"]:focus {
+      outline: none;
+      border-color: var(--color-action-primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    }
+    .form-newsletter .btn { white-space: nowrap; }
+
+    /* ================================================================
+       Dark Mode Toggle
+       ================================================================ */
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--color-border-default);
+      border-radius: var(--radius-full);
+      inline-size: 40px;
+      block-size: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: var(--text-lg);
+      color: var(--color-text-secondary);
+      transition: background var(--duration-fast) ease, color var(--duration-fast) ease;
+      font-family: inherit;
+    }
+    .theme-toggle:hover {
+      background: var(--color-bg-secondary);
+      color: var(--color-text-primary);
+    }
+
+    /* ================================================================
+       Back to Top
+       ================================================================ */
+    .back-to-top {
+      position: fixed;
+      inset-block-end: var(--space-xl);
+      inset-inline-end: var(--space-xl);
+      z-index: 99;
+      inline-size: 48px;
+      block-size: 48px;
+      border-radius: var(--radius-full);
+      background: var(--color-action-primary);
+      color: var(--color-action-text);
+      border: none;
+      cursor: pointer;
+      font-size: var(--text-xl);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(12px);
+      transition:
+        opacity var(--duration-normal) ease,
+        visibility var(--duration-normal) ease,
+        transform var(--duration-normal) var(--ease-out),
+        background var(--duration-fast) ease;
+    }
+    .back-to-top.visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
+    .back-to-top:hover {
+      background: var(--color-action-hover);
+      transform: translateY(-2px);
+    }
+
+    /* ================================================================
+       Image Loading Placeholder
+       ================================================================ */
+    .img-placeholder {
+      background: var(--color-border-default);
+      border-radius: var(--radius-md);
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-text-secondary);
+      font-size: var(--text-sm);
+      overflow: hidden;
+    }
+    .img-placeholder img {
+      inline-size: 100%;
+      block-size: 100%;
+      object-fit: cover;
+    }
+    .img-loading {
+      content-visibility: auto;
+      contain: content;
+    }
+
+    /* ================================================================
+       Footer
+       ================================================================ */
+    .site-footer {
+      border-block-start: 1px solid var(--color-border-default);
+      padding-block: var(--space-2xl);
+      text-align: center;
+    }
+
+    /* ================================================================
+       Print Styles
+       ================================================================ */
+    @media print {
+      *,
+      *::before,
+      *::after {
+        background: transparent !important;
+        color: #000 !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+      }
+      .site-header,
+      .back-to-top,
+      .theme-toggle,
+      .btn {
+        display: none !important;
+      }
+      .section { padding-block: 1rem; }
+      a[href]::after { content: " (" attr(href) ")"; }
+      .container { max-inline-size: 100%; }
+      body { font-size: 12pt; line-height: 1.5; }
+    }
+
+    /* ================================================================
+       Reduced Motion
+       ================================================================ */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      .testimonials-track { animation: none !important; }
+    }
+
+    /* ================================================================
+       Focus Management
+       ================================================================ */
+    :focus-visible {
+      outline: 3px solid var(--color-action-primary);
+      outline-offset: 2px;
+    }
+    :focus:not(:focus-visible) {
+      outline: none;
+    }
+
+    /* ================================================================
+       Container Query Support (progressive enhancement)
+       ================================================================ */
+    @container (max-width: 360px) {
+      .card { padding: var(--space-md); }
+      .hero-actions { flex-direction: column; align-items: center; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ==============================================================
+       Skip to Content
+       =============================================================== -->
+  <a href="#main-content" class="skip-link">Skip to main content</a>
+
+  <!-- ==============================================================
+       Site Header
+       =============================================================== -->
+  <header class="site-header" role="banner">
+    <div class="container">
+      <a href="#" class="site-logo" aria-label="Brand Home">Brand</a>
+      <nav class="site-nav" aria-label="Main navigation">
+        <a href="#features">Features</a>
+        <a href="#testimonials">Testimonials</a>
+        <a href="#newsletter">Stay Updated</a>
+        <a href="#" class="btn btn-primary">Get Started</a>
+        <button class="theme-toggle" aria-label="Toggle dark mode" type="button">&#9790;</button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ==============================================================
+       Main Content
+       =============================================================== -->
+  <main id="main-content">
+    <!-- Hero Section -->
+    <section class="hero section" aria-labelledby="hero-title">
+      <div class="container hero-content">
+        <h1 id="hero-title">Build Something Premium</h1>
+        <p style="font-size:var(--text-xl);margin-block-start:var(--space-lg);">
+          Replace this with your value proposition. Clear, benefit-driven messaging that speaks to your audience.
+        </p>
+        <div class="hero-actions">
+          <a href="#" class="btn btn-primary">Primary CTA</a>
+          <a href="#" class="btn btn-secondary">Secondary</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="section" style="background:var(--color-bg-secondary);" aria-labelledby="features-title">
+      <div class="container">
+        <h2 id="features-title" style="text-align:center;margin-block-end:var(--space-2xl);">Features</h2>
+        <div class="features-grid">
+          <article class="card">
+            <h3>Feature One</h3>
+            <p style="margin-block-start:var(--space-sm);">Describe the benefit this feature provides.</p>
+          </article>
+          <article class="card">
+            <h3>Feature Two</h3>
+            <p style="margin-block-start:var(--space-sm);">Describe the benefit this feature provides.</p>
+          </article>
+          <article class="card">
+            <h3>Feature Three</h3>
+            <p style="margin-block-start:var(--space-sm);">Describe the benefit this feature provides.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section id="testimonials" class="section testimonials" aria-labelledby="testimonials-title">
+      <div class="container">
+        <h2 id="testimonials-title" style="text-align:center;margin-block-end:var(--space-2xl);">What People Say</h2>
+      </div>
+      <div class="testimonials-track" role="list" aria-label="Customer testimonials">
+        <div class="testimonial-card" role="listitem">
+          <blockquote>"Absolutely transformed our workflow. The clean design philosophy really shines through."</blockquote>
+          <cite>&mdash; Alex Rivera, Product Lead</cite>
+        </div>
+        <div class="testimonial-card" role="listitem">
+          <blockquote>"The attention to detail is unmatched. Every pixel has a purpose."</blockquote>
+          <cite>&mdash; Samira Chen, Designer</cite>
+        </div>
+        <div class="testimonial-card" role="listitem">
+          <blockquote>"We saw a 40% improvement in engagement after switching to this approach."</blockquote>
+          <cite>&mdash; Jordan Taylor, Growth</cite>
+        </div>
+        <!-- Duplicate for seamless marquee -->
+        <div class="testimonial-card" role="listitem" aria-hidden="true">
+          <blockquote>"Absolutely transformed our workflow. The clean design philosophy really shines through."</blockquote>
+          <cite>&mdash; Alex Rivera, Product Lead</cite>
+        </div>
+        <div class="testimonial-card" role="listitem" aria-hidden="true">
+          <blockquote>"The attention to detail is unmatched. Every pixel has a purpose."</blockquote>
+          <cite>&mdash; Samira Chen, Designer</cite>
+        </div>
+        <div class="testimonial-card" role="listitem" aria-hidden="true">
+          <blockquote>"We saw a 40% improvement in engagement after switching to this approach."</blockquote>
+          <cite>&mdash; Jordan Taylor, Growth</cite>
+        </div>
+      </div>
+    </section>
+
+    <!-- Newsletter Section -->
+    <section id="newsletter" class="section" style="background:var(--color-bg-secondary);" aria-labelledby="newsletter-title">
+      <div class="container" style="text-align:center;">
+        <h2 id="newsletter-title">Stay in the Loop</h2>
+        <p style="margin-block-end:var(--space-lg);">Get the latest updates and resources delivered to your inbox.</p>
+        <form class="form-newsletter" novalidate>
+          <label for="newsletter-email" class="visually-hidden">Email address</label>
+          <div class="input-group" role="group" aria-label="Newsletter signup">
+            <input type="email" id="newsletter-email" placeholder="you@example.com" required autocomplete="email" />
+            <button class="btn btn-primary" type="submit">Subscribe</button>
+          </div>
+          <p style="font-size:var(--text-xs);margin-block-start:var(--space-sm);">No spam. Unsubscribe anytime.</p>
+        </form>
+      </div>
+    </section>
+
+    <!-- Image Showcase Section (to demonstrate loading states) -->
+    <section class="section" aria-labelledby="showcase-title">
+      <div class="container">
+        <h2 id="showcase-title" style="text-align:center;margin-block-end:var(--space-2xl);">Visual Showcase</h2>
+        <div class="features-grid">
+          <div class="img-placeholder img-loading">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3C/svg%3E"
+                 data-src="https://picsum.photos/seed/a/640/360"
+                 alt="Showcase image one"
+                 loading="lazy"
+                 decoding="async"
+                 width="640"
+                 height="360"
+                 style="background:var(--color-border-default);" />
+          </div>
+          <div class="img-placeholder img-loading">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3C/svg%3E"
+                 data-src="https://picsum.photos/seed/b/640/360"
+                 alt="Showcase image two"
+                 loading="lazy"
+                 decoding="async"
+                 width="640"
+                 height="360"
+                 style="background:var(--color-border-default);" />
+          </div>
+          <div class="img-placeholder img-loading">
+            <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 9'%3E%3C/svg%3E"
+                 data-src="https://picsum.photos/seed/c/640/360"
+                 alt="Showcase image three"
+                 loading="lazy"
+                 decoding="async"
+                 width="640"
+                 height="360"
+                 style="background:var(--color-border-default);" />
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==============================================================
+       Footer
+       =============================================================== -->
+  <footer class="site-footer" role="contentinfo">
+    <div class="container">
+      <p style="font-size:var(--text-sm);">&copy; 2026 Brand. All rights reserved.</p>
+      <nav aria-label="Legal and social links">
+        <a href="#" style="font-size:var(--text-sm);margin-inline:var(--space-sm);">Privacy</a>
+        <a href="#" style="font-size:var(--text-sm);margin-inline:var(--space-sm);">Terms</a>
+      </nav>
+    </div>
+  </footer>
+
+  <!-- ==============================================================
+       Back to Top Button
+       =============================================================== -->
+  <button class="back-to-top" aria-label="Back to top" type="button">&uarr;</button>
+
+  <!-- ==============================================================
+       Scripts
+       =============================================================== -->
+  <script>
+    (function() {
+      'use strict';
+
+      /* ---- Dark Mode Toggle ---- */
+      const toggle = document.querySelector('.theme-toggle');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)');
+      const stored = localStorage.getItem('theme');
+
+      function applyTheme(theme) {
+        document.documentElement.classList.remove('dark', 'light');
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+        else if (theme === 'light') document.documentElement.classList.add('light');
+        toggle.textContent = theme === 'dark' ? '\u2600' : '\u263E';
+      }
+
+      if (stored) {
+        applyTheme(stored);
+      } else {
+        applyTheme(prefersDark.matches ? 'dark' : 'light');
+      }
+
+      toggle.addEventListener('click', function() {
+        const isDark = document.documentElement.classList.contains('dark');
+        const next = isDark ? 'light' : 'dark';
+        applyTheme(next);
+        localStorage.setItem('theme', next);
+      });
+
+      /* ---- Back to Top ---- */
+      var backBtn = document.querySelector('.back-to-top');
+      var scrollThreshold = 400;
+
+      window.addEventListener('scroll', function() {
+        if (window.scrollY > scrollThreshold) {
+          backBtn.classList.add('visible');
+        } else {
+          backBtn.classList.remove('visible');
+        }
+      }, { passive: true });
+
+      backBtn.addEventListener('click', function() {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      /* ---- Lazy-load images with placeholder ---- */
+      if ('IntersectionObserver' in window) {
+        var lazyImages = document.querySelectorAll('img[loading="lazy"]');
+        var observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting) {
+              var img = entry.target;
+              if (img.dataset.src) {
+                img.src = img.dataset.src;
+                img.removeAttribute('data-src');
+              }
+              observer.unobserve(img);
+            }
+          });
+        }, { rootMargin: '200px' });
+
+        lazyImages.forEach(function(img) { observer.observe(img); });
+      }
+
+      /* ---- Newsletter form (prevent actual submit) ---- */
+      var form = document.querySelector('.form-newsletter');
+      if (form) {
+        form.addEventListener('submit', function(e) {
+          e.preventDefault();
+          var email = document.getElementById('newsletter-email');
+          if (email && email.value.trim()) {
+            alert('Thank you for subscribing! (Demo)');
+            email.value = '';
+          }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

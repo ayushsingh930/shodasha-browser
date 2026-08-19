@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Performance Engineering Guide - फ्रंटएंड और बैकएंड ऑप्टिमाइजेशन</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.6}
+.container{max-width:1200px;margin:0 auto;padding:20px}
+header{background:linear-gradient(135deg,#1e3a5f,#0f172a);color:#fff;padding:60px 20px;text-align:center}
+header h1{font-size:2.5em;margin-bottom:10px}
+header p{font-size:1.2em;color:#94a3b8;max-width:700px;margin:0 auto}
+.section{margin:40px 0;background:#fff;border-radius:16px;padding:40px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.section h2{font-size:1.8em;margin-bottom:8px;color:#0f172a;border-left:5px solid #3b82f6;padding-left:16px}
+.section .hinglish{margin-bottom:24px;color:#475569;font-size:1.05em}
+.section .hinglish b{color:#1e40af}
+.diagram{margin:30px auto;display:block;max-width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin:24px 0}
+.card{background:#f1f5f9;border-radius:12px;padding:24px;border:1px solid #e2e8f0}
+.card h3{color:#0f172a;margin-bottom:8px}
+.card p{color:#475569;font-size:.95em}
+.card .metric{font-size:2em;font-weight:700;color:#3b82f6;display:block;margin:8px 0}
+.badge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:.8em;font-weight:600}
+.badge.good{background:#dcfce7;color:#166534}
+.badge.needs{background:#fef9c3;color:#854d0e}
+.badge.poor{background:#fee2e2;color:#991b1b}
+.flow-row{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;margin:24px 0}
+.flow-box{background:#e0f2fe;border:2px solid #7dd3fc;border-radius:10px;padding:16px 24px;text-align:center;font-weight:600;color:#0369a1;min-width:100px}
+.flow-arrow{font-size:1.5em;color:#94a3b8}
+table{width:100%;border-collapse:collapse;margin:20px 0}
+th{background:#f1f5f9;text-align:left;padding:12px 16px;font-weight:600;color:#0f172a}
+td{padding:12px 16px;border-top:1px solid #e2e8f0;color:#475569}
+tr:hover td{background:#f8fafc}
+.metric-bar{height:24px;border-radius:6px;margin:4px 0;position:relative;overflow:hidden}
+.metric-bar .fill{height:100%;border-radius:6px;transition:width .6s ease}
+.metric-bar .label{position:absolute;right:8px;top:2px;font-size:.75em;font-weight:600;color:#fff}
+.target-badge{display:inline-block;background:#dbeafe;color:#1e40af;border-radius:6px;padding:2px 8px;font-size:.85em;margin:2px}
+.checklist{list-style:none;padding:0}
+.checklist li{padding:10px 16px;margin:4px 0;background:#f8fafc;border-radius:8px;border-left:4px solid #3b82f6}
+.checklist li::before{content:"✓ ";color:#16a34a;font-weight:700}
+.compare-table td:first-child{font-weight:600}
+code{background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:.9em;color:#dc2626}
+pre{background:#0f172a;color:#e2e8f0;padding:16px;border-radius:10px;overflow-x:auto;margin:16px 0;font-size:.9em}
+pre .cm{color:#64748b}
+pre .kw{color:#c084fc}
+pre .fn{color:#60a5fa}
+pre .str{color:#34d399}
+@media(max-width:768px){header h1{font-size:1.8em}.section{padding:24px}.flow-box{padding:12px 16px;min-width:80px;font-size:.9em}}
+@media print{.section{page-break-inside:avoid}header{break-after:avoid}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <h1>⚡ Performance Engineering Guide</h1>
+    <p>फ्रंटएंड और बैकएंड परफॉर्मेंस ऑप्टिमाइजेशन की पूरी जानकारी — Core Web Vitals से लेकर Node.js क्लस्टरिंग तक, सब कुछ आसान भाषा में</p>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- Section 1: What is Performance Engineering -->
+<div class="section">
+  <h2>🤔 Performance Engineering क्या है?</h2>
+  <div class="hinglish">
+    <b>Performance Engineering</b> मतलब अपनी <b>application</b> को <b>fast</b>, <b>reliable</b> और <b>scalable</b> बनाने की complete process. यह सिर्फ code optimize करना नहीं है — बल्कि har layer ko optimize karna hai: <b>browser</b> → <b>network</b> → <b>server</b> → <b>database</b>.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 800 320" width="800" height="320">
+    <defs>
+      <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#3b82f6"/><stop offset="100%" stop-color="#1d4ed8"/></linearGradient>
+      <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#10b981"/><stop offset="100%" stop-color="#059669"/></linearGradient>
+      <linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f59e0b"/><stop offset="100%" stop-color="#d97706"/></linearGradient>
+      <linearGradient id="g4" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#ef4444"/><stop offset="100%" stop-color="#dc2626"/></linearGradient>
+    </defs>
+    <rect x="20" y="40" rx="14" width="170" height="240" fill="url(#g1)" opacity=".9"/>
+    <text x="105" y="80" text-anchor="middle" fill="#fff" font-weight="700" font-size="18">🌐 Frontend</text>
+    <text x="105" y="105" text-anchor="middle" fill="#bfdbfe" font-size="13">Browser Optimization</text>
+    <text x="105" y="135" text-anchor="middle" fill="#bfdbfe" font-size="12">• Core Web Vitals</text>
+    <text x="105" y="155" text-anchor="middle" fill="#bfdbfe" font-size="12">• Code Splitting</text>
+    <text x="105" y="175" text-anchor="middle" fill="#bfdbfe" font-size="12">• Image Opt.</text>
+    <text x="105" y="195" text-anchor="middle" fill="#bfdbfe" font-size="12">• Lazy Loading</text>
+    <text x="105" y="215" text-anchor="middle" fill="#bfdbfe" font-size="12">• Caching</text>
+    <text x="105" y="240" text-anchor="middle" fill="#bfdbfe" font-size="12">• Bundle Size</text>
+
+    <rect x="220" y="40" rx="14" width="170" height="240" fill="url(#g2)" opacity=".9"/>
+    <text x="305" y="80" text-anchor="middle" fill="#fff" font-weight="700" font-size="18">📡 Network</text>
+    <text x="305" y="105" text-anchor="middle" fill="#d1fae5" font-size="13">Transport Layer</text>
+    <text x="305" y="135" text-anchor="middle" fill="#d1fae5" font-size="12">• CDN</text>
+    <text x="305" y="155" text-anchor="middle" fill="#d1fae5" font-size="12">• HTTP/2 & HTTP/3</text>
+    <text x="305" y="175" text-anchor="middle" fill="#d1fae5" font-size="12">• Compression</text>
+    <text x="305" y="195" text-anchor="middle" fill="#d1fae5" font-size="12">• Prefetch/Preload</text>
+    <text x="305" y="215" text-anchor="middle" fill="#d1fae5" font-size="12">• DNS Optimization</text>
+    <text x="305" y="240" text-anchor="middle" fill="#d1fae5" font-size="12">• Connection Pool</text>
+
+    <rect x="420" y="40" rx="14" width="170" height="240" fill="url(#g3)" opacity=".9"/>
+    <text x="505" y="80" text-anchor="middle" fill="#fff" font-weight="700" font-size="18">⚙️ Backend</text>
+    <text x="505" y="105" text-anchor="middle" fill="#fef3c7" font-size="13">Node.js Runtimes</text>
+    <text x="505" y="135" text-anchor="middle" fill="#fef3c7" font-size="12">• Event Loop</text>
+    <text x="505" y="155" text-anchor="middle" fill="#fef3c7" font-size="12">• Clustering</text>
+    <text x="505" y="175" text-anchor="middle" fill="#fef3c7" font-size="12">• Async/Await</text>
+    <text x="505" y="195" text-anchor="middle" fill="#fef3c7" font-size="12">• Load Balancing</text>
+    <text x="505" y="215" text-anchor="middle" fill="#fef3c7" font-size="12">• Memory Mgmt</text>
+    <text x="505" y="240" text-anchor="middle" fill="#fef3c7" font-size="12">• Profiling</text>
+
+    <rect x="620" y="40" rx="14" width="170" height="240" fill="url(#g4)" opacity=".9"/>
+    <text x="705" y="80" text-anchor="middle" fill="#fff" font-weight="700" font-size="18">🗄️ Data</text>
+    <text x="705" y="105" text-anchor="middle" fill="#fecaca" font-size="13">Storage Layer</text>
+    <text x="705" y="135" text-anchor="middle" fill="#fecaca" font-size="12">• Query Opt.</text>
+    <text x="705" y="155" text-anchor="middle" fill="#fecaca" font-size="12">• Indexing</text>
+    <text x="705" y="175" text-anchor="middle" fill="#fecaca" font-size="12">• Redis Cache</text>
+    <text x="705" y="195" text-anchor="middle" fill="#fecaca" font-size="12">• Connection Pool</text>
+    <text x="705" y="215" text-anchor="middle" fill="#fecaca" font-size="12">• Read Replicas</text>
+    <text x="705" y="240" text-anchor="middle" fill="#fecaca" font-size="12">• Sharding</text>
+
+    <text x="105" y="310" text-anchor="middle" fill="#64748b" font-size="13">Client Side</text>
+    <text x="305" y="310" text-anchor="middle" fill="#64748b" font-size="13">Network</text>
+    <text x="505" y="310" text-anchor="middle" fill="#64748b" font-size="13">Server Side</text>
+    <text x="705" y="310" text-anchor="middle" fill="#64748b" font-size="13">Data Layer</text>
+  </svg>
+</div>
+
+<!-- Section 2: Why Performance Matters -->
+<div class="section">
+  <h2>💰 Performance Kyun Matters?</h2>
+  <div class="hinglish">
+    <b>Slow website = lost business.</b> Google ke research के मुताबिक, <b>53% users</b> वेबसाइट छोड़ देते हैं अगर वह <b>3 सेकंड</b> में load नहीं होती. Har <b>100ms delay</b> में conversion <b>7% कम</b> हो जाता है.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 700 260" width="700" height="260">
+    <rect x="40" y="50" rx="10" width="130" height="180" fill="#fee2e2"/>
+    <text x="105" y="80" text-anchor="middle" fill="#991b1b" font-weight="700" font-size="22">3s+ Load</text>
+    <text x="105" y="110" text-anchor="middle" fill="#991b1b" font-size="14">53% Users</text>
+    <text x="105" y="130" text-anchor="middle" fill="#991b1b" font-size="14">Leave Website</text>
+    <text x="105" y="160" text-anchor="middle" fill="#dc2626" font-weight="600" font-size="16">📉 -53%</text>
+    <text x="105" y="185" text-anchor="middle" fill="#991b1b" font-size="12">Bounce Rate</text>
+    <text x="105" y="215" text-anchor="middle" fill="#991b1b" font-size="11">Revenue Loss ⚠️</text>
+
+    <rect x="200" y="50" rx="10" width="130" height="180" fill="#fef3c7"/>
+    <text x="265" y="80" text-anchor="middle" fill="#854d0e" font-weight="700" font-size="18">100ms Delay</text>
+    <text x="265" y="115" text-anchor="middle" fill="#854d0e" font-size="13">= 7% Drop in</text>
+    <text x="265" y="135" text-anchor="middle" fill="#854d0e" font-weight="600" font-size="16">Conversions</text>
+    <text x="265" y="170" text-anchor="middle" fill="#d97706" font-size="13">📱 Amazon found</text>
+    <text x="265" y="190" text-anchor="middle" fill="#d97706" font-size="12">100ms delay =</text>
+    <text x="265" y="210" text-anchor="middle" fill="#d97706" font-weight="600" font-size="13">$1.6B loss/year</text>
+
+    <rect x="360" y="50" rx="10" width="130" height="180" fill="#dbeafe"/>
+    <text x="425" y="80" text-anchor="middle" fill="#1e3a8a" font-weight="700" font-size="18">Google Ranking</text>
+    <text x="425" y="115" text-anchor="middle" fill="#1e40af" font-size="13">Core Web Vitals</text>
+    <text x="425" y="135" text-anchor="middle" fill="#1e40af" font-size="13">Ranking Factor</text>
+    <text x="425" y="165" text-anchor="middle" fill="#1e40af" font-weight="600" font-size="15">🔝 Slow Site</text>
+    <text x="425" y="185" text-anchor="middle" fill="#1e40af" font-weight="600" font-size="16">= Low Rank</text>
+
+    <rect x="520" y="50" rx="10" width="150" height="180" fill="#dcfce7"/>
+    <text x="595" y="80" text-anchor="middle" fill="#166534" font-weight="700" font-size="18">Fast = More $</text>
+    <text x="595" y="115" text-anchor="middle" fill="#166534" font-size="13">Walmart:</text>
+    <text x="595" y="135" text-anchor="middle" fill="#166534" font-weight="600" font-size="15">+2% Conversion</text>
+    <text x="595" y="160" text-anchor="middle" fill="#166534" font-size="13">for every 1s</text>
+    <text x="595" y="180" text-anchor="middle" fill="#166534" font-size="12">improvement</text>
+    <text x="595" y="210" text-anchor="middle" fill="#16a34a" font-weight="600" font-size="13">🚀 +$ Revenue</text>
+
+    <text x="175" y="245" text-anchor="middle" fill="#64748b" font-size="12">⏪ Slow → ⏩ Fast</text>
+  </svg>
+</div>
+
+<!-- Section 3: Core Web Vitals -->
+<div class="section">
+  <h2>📊 Core Web Vitals</h2>
+  <div class="hinglish">
+    <b>Core Web Vitals</b> वो metrics हैं जिनसे Google यह measure करता है कि आपकी website user experience कितनी <b>good</b> है. Three main metrics: <b>LCP</b> (loading), <b>FID/INP</b> (interactivity), <b>CLS</b> (stability).
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 320" width="750" height="320">
+    <!-- LCP -->
+    <rect x="20" y="10" rx="10" width="230" height="280" fill="#f0f9ff" stroke="#7dd3fc" stroke-width="2"/>
+    <text x="135" y="45" text-anchor="middle" fill="#0369a1" font-weight="700" font-size="20">LCP</text>
+    <text x="135" y="65" text-anchor="middle" fill="#475569" font-size="12">Largest Contentful Paint</text>
+    <text x="135" y="85" text-anchor="middle" fill="#475569" font-size="12">जब बड़ा element दिखता है</text>
+    <line x1="40" y1="105" x2="230" y2="105" stroke="#e2e8f0"/>
+    <text x="135" y="125" text-anchor="middle" fill="#475569" font-size="11">Target: <tspan font-weight="700" fill="#16a34a">< 2.5s</tspan></text>
+    <rect x="40" y="140" rx="6" width="190" height="36" fill="#dcfce7"/>
+    <text x="135" y="163" text-anchor="middle" fill="#166534" font-weight="600" font-size="13">✅ GOOD  < 2.5s</text>
+    <rect x="40" y="182" rx="6" width="190" height="36" fill="#fef9c3"/>
+    <text x="135" y="205" text-anchor="middle" fill="#854d0e" font-weight="600" font-size="13">⚠️ 2.5s - 4.0s</text>
+    <rect x="40" y="224" rx="6" width="190" height="36" fill="#fee2e2"/>
+    <text x="135" y="247" text-anchor="middle" fill="#991b1b" font-weight="600" font-size="13">❌ POOR > 4.0s</text>
+
+    <text x="135" y="280" text-anchor="middle" fill="#64748b" font-size="11">Hero image, preload, CDN</text>
+
+    <!-- FID / INP -->
+    <rect x="270" y="10" rx="10" width="230" height="280" fill="#f0fdf4" stroke="#86efac" stroke-width="2"/>
+    <text x="385" y="45" text-anchor="middle" fill="#166534" font-weight="700" font-size="20">FID / INP</text>
+    <text x="385" y="65" text-anchor="middle" fill="#475569" font-size="12">First Input Delay</text>
+    <text x="385" y="85" text-anchor="middle" fill="#475569" font-size="12">Interaction के लिए wait</text>
+    <line x1="290" y1="105" x2="480" y2="105" stroke="#e2e8f0"/>
+    <text x="385" y="125" text-anchor="middle" fill="#475569" font-size="11">Target: <tspan font-weight="700" fill="#16a34a">< 100ms</tspan></text>
+    <rect x="290" y="140" rx="6" width="190" height="36" fill="#dcfce7"/>
+    <text x="385" y="163" text-anchor="middle" fill="#166534" font-weight="600" font-size="13">✅ GOOD  < 100ms</text>
+    <rect x="290" y="182" rx="6" width="190" height="36" fill="#fef9c3"/>
+    <text x="385" y="205" text-anchor="middle" fill="#854d0e" font-weight="600" font-size="13">⚠️ 100ms - 300ms</text>
+    <rect x="290" y="224" rx="6" width="190" height="36" fill="#fee2e2"/>
+    <text x="385" y="247" text-anchor="middle" fill="#991b1b" font-weight="600" font-size="13">❌ POOR > 300ms</text>
+    <text x="385" y="280" text-anchor="middle" fill="#64748b" font-size="11">Code splitting, web workers</text>
+
+    <!-- CLS -->
+    <rect x="520" y="10" rx="10" width="210" height="280" fill="#fff7ed" stroke="#fdba74" stroke-width="2"/>
+    <text x="625" y="45" text-anchor="middle" fill="#9a3412" font-weight="700" font-size="20">CLS</text>
+    <text x="625" y="65" text-anchor="middle" fill="#475569" font-size="12">Cumulative Layout Shift</text>
+    <text x="625" y="85" text-anchor="middle" fill="#475569" font-size="12">Layout जब हिलता है</text>
+    <line x1="540" y1="105" x2="710" y2="105" stroke="#e2e8f0"/>
+    <text x="625" y="125" text-anchor="middle" fill="#475569" font-size="11">Target: <tspan font-weight="700" fill="#16a34a">< 0.1</tspan></text>
+    <rect x="540" y="140" rx="6" width="170" height="36" fill="#dcfce7"/>
+    <text x="625" y="163" text-anchor="middle" fill="#166534" font-weight="600" font-size="13">✅ GOOD < 0.1</text>
+    <rect x="540" y="182" rx="6" width="170" height="36" fill="#fef9c3"/>
+    <text x="625" y="205" text-anchor="middle" fill="#854d0e" font-weight="600" font-size="13">⚠️ 0.1 - 0.25</text>
+    <rect x="540" y="224" rx="6" width="170" height="36" fill="#fee2e2"/>
+    <text x="625" y="247" text-anchor="middle" fill="#991b1b" font-weight="600" font-size="13">❌ POOR > 0.25</text>
+    <text x="625" y="280" text-anchor="middle" fill="#64748b" font-size="11">Set dims, reserve space</text>
+  </svg>
+
+  <div class="grid">
+    <div class="card">
+      <h3>🏗️ LCP — Loading</h3>
+      <span class="metric">< 2.5s</span>
+      <p>Hero image preload karo, server response time optimize karo, CDN use karo</p>
+    </div>
+    <div class="card">
+      <h3>👆 FID/INP — Interactivity</h3>
+      <span class="metric">< 100ms</span>
+      <p>Long tasks ko break karo, web workers use karo, JS defer karo</p>
+    </div>
+    <div class="card">
+      <h3>🎯 CLS — Stability</h3>
+      <span class="metric">< 0.1</span>
+      <p>Images pe width/height set karo, ads ke liye space reserve karo</p>
+    </div>
+  </div>
+</div>
+
+<!-- Section 4: Rendering Patterns -->
+<div class="section">
+  <h2>🔄 Rendering Patterns</h2>
+  <div class="hinglish">
+    <b>Rendering pattern</b> decide karta hai ki aapka content <b>kahan</b> render ho — <b>client</b> pe ya <b>server</b> pe. Sahi pattern select karna performance aur SEO dono ke liye important hai.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 330" width="750" height="330">
+    <!-- CSR -->
+    <rect x="15" y="10" rx="12" width="140" height="300" fill="#f0f9ff" stroke="#7dd3fc" stroke-width="1.5"/>
+    <rect x="30" y="18" rx="8" width="110" height="28" fill="#3b82f6"/><text x="85" y="37" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">CSR</text>
+    <text x="85" y="65" text-anchor="middle" fill="#0369a1" font-weight="600" font-size="12">Client-Side</text>
+    <rect x="30" y="85" rx="6" width="110" height="22" fill="#e0f2fe"/><text x="85" y="100" text-anchor="middle" fill="#0369a1" font-size="10">Empty HTML</text>
+    <rect x="30" y="112" rx="6" width="110" height="22" fill="#e0f2fe"/><text x="85" y="127" text-anchor="middle" fill="#0369a1" font-size="10">+ JS Bundle</text>
+    <rect x="30" y="139" rx="6" width="110" height="22" fill="#e0f2fe"/><text x="85" y="154" text-anchor="middle" fill="#0369a1" font-size="10">→ Browser</text>
+    <rect x="30" y="166" rx="6" width="110" height="22" fill="#e0f2fe"/><text x="85" y="181" text-anchor="middle" fill="#0369a1" font-size="10">Renders All</text>
+    <text x="85" y="215" text-anchor="middle" fill="#475569" font-size="10">Slow FCP</text>
+    <text x="85" y="230" text-anchor="middle" fill="#475569" font-size="10">Fast TTI</text>
+    <text x="85" y="245" text-anchor="middle" fill="#475569" font-size="10">Poor SEO</text>
+    <text x="85" y="275" text-anchor="middle" fill="#64748b" font-size="10">📱 Dashboard</text>
+    <text x="85" y="290" text-anchor="middle" fill="#64748b" font-size="10">Auth Apps</text>
+
+    <!-- SSR -->
+    <rect x="170" y="10" rx="12" width="140" height="300" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+    <rect x="185" y="18" rx="8" width="110" height="28" fill="#10b981"/><text x="240" y="37" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">SSR</text>
+    <text x="240" y="65" text-anchor="middle" fill="#166534" font-weight="600" font-size="12">Server-Side</text>
+    <rect x="185" y="85" rx="6" width="110" height="22" fill="#d1fae5"/><text x="240" y="100" text-anchor="middle" fill="#166534" font-size="10">Request → Server</text>
+    <rect x="185" y="112" rx="6" width="110" height="22" fill="#d1fae5"/><text x="240" y="127" text-anchor="middle" fill="#166534" font-size="10">Fetch Data</text>
+    <rect x="185" y="139" rx="6" width="110" height="22" fill="#d1fae5"/><text x="240" y="154" text-anchor="middle" fill="#166534" font-size="10">Render HTML</text>
+    <rect x="185" y="166" rx="6" width="110" height="22" fill="#d1fae5"/><text x="240" y="181" text-anchor="middle" fill="#166534" font-size="10">Send to Client</text>
+    <text x="240" y="215" text-anchor="middle" fill="#475569" font-size="10">Fast FCP</text>
+    <text x="240" y="230" text-anchor="middle" fill="#475569" font-size="10">Good SEO</text>
+    <text x="240" y="245" text-anchor="middle" fill="#475569" font-size="10">Slow TTI</text>
+    <text x="240" y="275" text-anchor="middle" fill="#64748b" font-size="10">📰 E-commerce</text>
+    <text x="240" y="290" text-anchor="middle" fill="#64748b" font-size="10">Content Sites</text>
+
+    <!-- SSG -->
+    <rect x="325" y="10" rx="12" width="140" height="300" fill="#fefce8" stroke="#fde047" stroke-width="1.5"/>
+    <rect x="340" y="18" rx="8" width="110" height="28" fill="#eab308"/><text x="395" y="37" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">SSG</text>
+    <text x="395" y="65" text-anchor="middle" fill="#854d0e" font-weight="600" font-size="12">Static Gen.</text>
+    <rect x="340" y="85" rx="6" width="110" height="22" fill="#fef9c3"/><text x="395" y="100" text-anchor="middle" fill="#854d0e" font-size="10">Build Time</text>
+    <rect x="340" y="112" rx="6" width="110" height="22" fill="#fef9c3"/><text x="395" y="127" text-anchor="middle" fill="#854d0e" font-size="10">↑ Fetch All Data</text>
+    <rect x="340" y="139" rx="6" width="110" height="22" fill="#fef9c3"/><text x="395" y="154" text-anchor="middle" fill="#854d0e" font-size="10">Generate HTML</text>
+    <rect x="340" y="166" rx="6" width="110" height="22" fill="#fef9c3"/><text x="395" y="181" text-anchor="middle" fill="#854d0e" font-size="10">CDN pe Deploy</text>
+    <text x="395" y="215" text-anchor="middle" fill="#475569" font-size="10">Fastest!</text>
+    <text x="395" y="230" text-anchor="middle" fill="#475569" font-size="10">Minimal Server Cost</text>
+    <text x="395" y="245" text-anchor="middle" fill="#475569" font-size="10">Stale Content</text>
+    <text x="395" y="275" text-anchor="middle" fill="#64748b" font-size="10">📝 Blog</text>
+    <text x="395" y="290" text-anchor="middle" fill="#64748b" font-size="10">Documentation</text>
+
+    <!-- ISR -->
+    <rect x="480" y="10" rx="12" width="140" height="300" fill="#fdf4ff" stroke="#d8b4fe" stroke-width="1.5"/>
+    <rect x="495" y="18" rx="8" width="110" height="28" fill="#a855f7"/><text x="550" y="37" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">ISR</text>
+    <text x="550" y="65" text-anchor="middle" fill="#7e22ce" font-weight="600" font-size="12">Incremental</text>
+    <rect x="495" y="85" rx="6" width="110" height="22" fill="#f3e8ff"/><text x="550" y="100" text-anchor="middle" fill="#7e22ce" font-size="10">Static at Build</text>
+    <rect x="495" y="112" rx="6" width="110" height="22" fill="#f3e8ff"/><text x="550" y="127" text-anchor="middle" fill="#7e22ce" font-size="10">+ Revalidate</text>
+    <rect x="495" y="139" rx="6" width="110" height="22" fill="#f3e8ff"/><text x="550" y="154" text-anchor="middle" fill="#7e22ce" font-size="10">Background</text>
+    <rect x="495" y="166" rx="6" width="110" height="22" fill="#f3e8ff"/><text x="550" y="181" text-anchor="middle" fill="#7e22ce" font-size="10">Refresh</text>
+    <text x="550" y="215" text-anchor="middle" fill="#475569" font-size="10">Best of Both</text>
+    <text x="550" y="230" text-anchor="middle" fill="#475569" font-size="10">Fast + Fresh</text>
+    <text x="550" y="245" text-anchor="middle" fill="#475569" font-size="10">Complex Setup</text>
+    <text x="550" y="275" text-anchor="middle" fill="#64748b" font-size="10">🛒 E-commerce</text>
+    <text x="550" y="290" text-anchor="middle" fill="#64748b" font-size="10">News</text>
+
+    <!-- Streaming -->
+    <rect x="635" y="10" rx="12" width="105" height="300" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+    <rect x="647" y="18" rx="8" width="80" height="28" fill="#f97316"/><text x="687" y="37" text-anchor="middle" fill="#fff" font-weight="700" font-size="12">Stream</text>
+    <rect x="647" y="60" rx="6" width="80" height="20" fill="#ffedd5"/><text x="687" y="74" text-anchor="middle" fill="#9a3412" font-size="9">Chunk 1</text>
+    <rect x="647" y="85" rx="6" width="80" height="20" fill="#ffedd5"/><text x="687" y="99" text-anchor="middle" fill="#9a3412" font-size="9">Chunk 2</text>
+    <rect x="647" y="110" rx="6" width="80" height="20" fill="#ffedd5"/><text x="687" y="124" text-anchor="middle" fill="#9a3412" font-size="9">Chunk 3</text>
+    <rect x="647" y="135" rx="6" width="80" height="20" fill="#ffedd5"/><text x="687" y="149" text-anchor="middle" fill="#9a3412" font-size="9">Chunk 4</text>
+    <rect x="647" y="160" rx="6" width="80" height="20" fill="#ffedd5"/><text x="687" y="174" text-anchor="middle" fill="#9a3412" font-size="9">Chunk 5</text>
+    <text x="687" y="215" text-anchor="middle" fill="#475569" font-size="10">Progressive</text>
+    <text x="687" y="230" text-anchor="middle" fill="#475569" font-size="10">Best TTFB</text>
+    <text x="687" y="245" text-anchor="middle" fill="#475569" font-size="10">Best UX</text>
+    <text x="687" y="275" text-anchor="middle" fill="#64748b" font-size="10">Data-heavy</text>
+    <text x="687" y="290" text-anchor="middle" fill="#64748b" font-size="10">Real-time</text>
+  </svg>
+</div>
+
+<!-- Section 5: Code Splitting & Bundling -->
+<div class="section">
+  <h2>✂️ Code Splitting & Bundling</h2>
+  <div class="hinglish">
+    <b>Code splitting</b> का मतलब है — बड़े JS bundle को <b>छोटे chunks</b> में तोड़ना. ताकि user सिर्फ <b>ज़रूरी code</b> download करे, बाकी बाद में आए. <b>Lazy loading</b> से initial load time कम होता है.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 260" width="750" height="260">
+    <!-- Before -->
+    <rect x="20" y="15" rx="8" width="340" height="40" fill="#fee2e2" stroke="#fca5a5"/>
+    <text x="190" y="41" text-anchor="middle" fill="#991b1b" font-weight="700" font-size="15">❌ Single Bundle: 500KB (All Code)</text>
+    <rect x="20" y="65" rx="8" width="340" height="30" fill="#fee2e2"/>
+    <text x="190" y="85" text-anchor="middle" fill="#991b1b" font-size="12">Blocks Main Thread → Slow TTI</text>
+
+    <!-- Arrow -->
+    <text x="380" y="58" text-anchor="middle" fill="#3b82f6" font-weight="700" font-size="28">→</text>
+
+    <!-- After -->
+    <rect x="420" y="10" rx="8" width="320" height="30" fill="#dcfce7" stroke="#86efac"/>
+    <text x="580" y="30" text-anchor="middle" fill="#166534" font-weight="700" font-size="14">✅ Code Splitting</text>
+
+    <rect x="420" y="50" rx="6" width="70" height="28" fill="#3b82f6"/>
+    <text x="455" y="69" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">Core 50K</text>
+    <rect x="498" y="50" rx="6" width="70" height="28" fill="#10b981"/>
+    <text x="533" y="69" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">RouteA 80K</text>
+    <rect x="576" y="50" rx="6" width="70" height="28" fill="#f59e0b"/>
+    <text x="611" y="69" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">RouteB 60K</text>
+    <rect x="654" y="50" rx="6" width="70" height="28" fill="#8b5cf6"/>
+    <text x="689" y="69" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">Vendor 150K</text>
+
+    <text x="455" y="100" text-anchor="middle" fill="#16a34a" font-size="11">⬇ Load First</text>
+    <text x="533" y="100" text-anchor="middle" fill="#64748b" font-size="11">⬇ On Navigate</text>
+    <text x="611" y="100" text-anchor="middle" fill="#64748b" font-size="11">⬇ On Navigate</text>
+    <text x="689" y="100" text-anchor="middle" fill="#64748b" font-size="11">⬇ Cached Sep.</text>
+
+    <text x="190" y="140" text-anchor="middle" fill="#64748b" font-size="12">TTI: High (waits for 500KB)</text>
+    <text x="580" y="140" text-anchor="middle" fill="#64748b" font-size="12">TTI: Low (only 50KB initial)</text>
+
+    <!-- Tree shaking visual -->
+    <text x="375" y="175" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="15">🌳 Tree Shaking</text>
+    <rect x="20" y="190" rx="8" width="340" height="55" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="190" y="212" text-anchor="middle" fill="#475569" font-size="12">import { <tspan fill="#dc2626">Button, Table, DatePicker, Alert, Modal</tspan> } from 'ui-lib'</text>
+    <text x="190" y="232" text-anchor="middle" fill="#475569" font-size="11">Only keep what's used → Remove dead code</text>
+
+    <rect x="420" y="190" rx="8" width="320" height="55" fill="#f0fdf4" stroke="#86efac"/>
+    <text x="580" y="212" text-anchor="middle" fill="#166534" font-size="12">import { <tspan fill="#16a34a">Button, Alert</tspan> } from 'ui-lib/button'</text>
+    <text x="580" y="232" text-anchor="middle" fill="#166534" font-size="11">✅ 70% smaller bundle!</text>
+  </svg>
+
+  <div class="grid">
+    <div class="card"><h3>🔀 Route-Level Split</h3><p>React.lazy + Suspense से हर route का code अलग load करें</p></div>
+    <div class="card"><h3>🧩 Component Lazy</h3><p>Heavy components (charts, editors) को तब load करें जब ज़रूरत हो</p></div>
+    <div class="card"><h3>📦 Vendor Split</h3><p>React, lodash जैसे libraries को अलग chunk में रखें ताकि cache हो सके</p></div>
+  </div>
+</div>
+
+<!-- Section 6: Image Optimization -->
+<div class="section">
+  <h2>🖼️ Image Optimization</h2>
+  <div class="hinglish">
+    <b>Images</b> एक typical webpage का <b>50% weight</b> होती हैं. अगर images optimize नहीं कीं तो <b>LCP</b> और <b>page load time</b> दोनों ख़राब होंगे. <b>WebP/AVIF</b>, <b>srcset</b> और <b>lazy loading</b> से 70% तक size कम हो सकता है!
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 320" width="750" height="320">
+    <!-- Format comparison -->
+    <text x="375" y="28" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="16">Image Format Comparison (Quality vs Size)</text>
+    <rect x="30" y="45" rx="8" width="150" height="130" fill="#fee2e2" stroke="#fca5a5"/>
+    <text x="105" y="72" text-anchor="middle" fill="#991b1b" font-weight="700" font-size="16">JPEG</text>
+    <rect x="50" y="85" rx="4" width="110" height="20" fill="#fca5a5"/><text x="105" y="99" text-anchor="middle" fill="#fff" font-size="11">100KB Original</text>
+    <rect x="50" y="110" rx="4" width="110" height="20" fill="#fca5a5"/><text x="105" y="124" text-anchor="middle" fill="#fff" font-size="11">Universal Support</text>
+    <rect x="50" y="135" rx="4" width="110" height="20" fill="#fca5a5"/><text x="105" y="149" text-anchor="middle" fill="#fff" font-size="11">Photos</text>
+
+    <rect x="200" y="45" rx="8" width="150" height="130" fill="#fef3c7" stroke="#fde68a"/>
+    <text x="275" y="72" text-anchor="middle" fill="#854d0e" font-weight="700" font-size="16">WebP</text>
+    <rect x="220" y="85" rx="4" width="110" height="20" fill="#fde68a"/><text x="275" y="99" text-anchor="middle" fill="#854d0e" font-size="11">~65KB (-35%)</text>
+    <rect x="220" y="110" rx="4" width="110" height="20" fill="#fde68a"/><text x="275" y="124" text-anchor="middle" fill="#854d0e" font-size="11">96% Support</text>
+    <rect x="220" y="135" rx="4" width="110" height="20" fill="#fde68a"/><text x="275" y="149" text-anchor="middle" fill="#854d0e" font-size="11">Modern Repl.</text>
+
+    <rect x="370" y="45" rx="8" width="150" height="130" fill="#dcfce7" stroke="#86efac"/>
+    <text x="445" y="72" text-anchor="middle" fill="#166534" font-weight="700" font-size="16">AVIF 🏆</text>
+    <rect x="390" y="85" rx="4" width="110" height="20" fill="#86efac"/><text x="445" y="99" text-anchor="middle" fill="#166534" font-size="11">~50KB (-50%)</text>
+    <rect x="390" y="110" rx="4" width="110" height="20" fill="#86efac"/><text x="445" y="124" text-anchor="middle" fill="#166534" font-size="11">80%+ Growing</text>
+    <rect x="390" y="135" rx="4" width="110" height="20" fill="#86efac"/><text x="445" y="149" text-anchor="middle" fill="#166534" font-size="11">Best Quality</text>
+
+    <rect x="540" y="45" rx="8" width="180" height="130" fill="#f0f9ff" stroke="#7dd3fc"/>
+    <text x="630" y="72" text-anchor="middle" fill="#0369a1" font-weight="700" font-size="16">SVG</text>
+    <rect x="560" y="85" rx="4" width="140" height="20" fill="#7dd3fc"/><text x="630" y="99" text-anchor="middle" fill="#0369a1" font-size="11">Scalable (tiny size)</text>
+    <rect x="560" y="110" rx="4" width="140" height="20" fill="#7dd3fc"/><text x="630" y="124" text-anchor="middle" fill="#0369a1" font-size="11">Icons, Logos</text>
+    <rect x="560" y="135" rx="4" width="140" height="20" fill="#7dd3fc"/><text x="630" y="149" text-anchor="middle" fill="#0369a1" font-size="11">Code in HTML</text>
+
+    <!-- Responsive images diagram -->
+    <text x="375" y="210" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="16">📐 Responsive Images with srcset</text>
+    <rect x="50" y="225" rx="6" width="130" height="22" fill="#e2e8f0"/><text x="115" y="240" text-anchor="middle" fill="#475569" font-size="11">Mobile 400w</text>
+    <rect x="200" y="225" rx="6" width="130" height="22" fill="#e2e8f0"/><text x="265" y="240" text-anchor="middle" fill="#475569" font-size="11">Tablet 800w</text>
+    <rect x="350" y="225" rx="6" width="130" height="22" fill="#e2e8f0"/><text x="415" y="240" text-anchor="middle" fill="#475569" font-size="11">Desktop 1200w</text>
+    <rect x="500" y="225" rx="6" width="130" height="22" fill="#e2e8f0"/><text x="565" y="240" text-anchor="middle" fill="#475569" font-size="11">Retina 2000w</text>
+
+    <text x="375" y="280" text-anchor="middle" fill="#16a34a" font-size="13">✅ Browser selects best size based on viewport</text>
+    <text x="375" y="300" text-anchor="middle" fill="#16a34a" font-size="13">✅ plus &lt;picture&gt; for format fallback</text>
+  </svg>
+
+  <div class="grid">
+    <div class="card"><h3>📉 Modern Formats</h3><p>JPEG → WebP/AVIF से 50% size कम करें. &lt;picture&gt; से fallback दें</p></div>
+    <div class="card"><h3>📏 Srcset</h3><p>हर screen size के लिए अलग image size serve करें — mobile pe छोटी, desktop pe बड़ी</p></div>
+    <div class="card"><h3>😴 Lazy Loading</h3><p>loading="lazy" से offscreen images को तब load करें जब user scroll करे</p></div>
+  </div>
+</div>
+
+<!-- Section 7: Caching Strategies -->
+<div class="section">
+  <h2>💾 Caching Strategies</h2>
+  <div class="hinglish">
+    <b>Caching</b> का मतलब — जो data बार-बार चाहिए, उसे <b>fast storage</b> में save कर दो. Browser se lekar server tak, har level pe caching se performance <b>dramatically improve</b> होती है.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 340" width="750" height="340">
+    <!-- CDN Cache -->
+    <rect x="15" y="15" rx="12" width="230" height="130" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="130" y="42" text-anchor="middle" fill="#1e40af" font-weight="700" font-size="14">🌍 Browser Cache</text>
+    <text x="130" y="65" text-anchor="middle" fill="#64748b" font-size="12">Cache-Control: max-age=31536000</text>
+    <text x="130" y="85" text-anchor="middle" fill="#64748b" font-size="11">+ immutable + ETag</text>
+    <text x="130" y="115" text-anchor="middle" fill="#16a34a" font-weight="600" font-size="12">⚡ Fastest (local)</text>
+
+    <rect x="265" y="15" rx="12" width="230" height="130" fill="#f0fdf4" stroke="#86efac"/>
+    <text x="380" y="42" text-anchor="middle" fill="#166534" font-weight="700" font-size="14">📡 CDN Cache</text>
+    <rect x="310" y="55" rx="6" width="60" height="24" fill="#86efac"/><text x="340" y="71" text-anchor="middle" fill="#166534" font-size="10">Edge NA</text>
+    <rect x="378" y="55" rx="6" width="60" height="24" fill="#86efac"/><text x="408" y="71" text-anchor="middle" fill="#166534" font-size="10">Edge EU</text>
+    <rect x="445" y="55" rx="6" width="30" height="24" fill="#86efac"/><text x="460" y="71" text-anchor="middle" fill="#166534" font-size="9">...</text>
+    <text x="380" y="105" text-anchor="middle" fill="#16a34a" font-size="12">Geographic proximity</text>
+    <text x="380" y="122" text-anchor="middle" fill="#16a34a" font-size="12">s-maxage, stale-while-revalidate</text>
+
+    <!-- Service Worker -->
+    <rect x="15" y="165" rx="12" width="230" height="150" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="130" y="192" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="14">⚙️ Service Worker</text>
+    <text x="130" y="215" text-anchor="middle" fill="#475569" font-size="12">Cache-First Strategy</text>
+    <text x="130" y="240" text-anchor="middle" fill="#64748b" font-size="11">self.addEventListener('fetch',</text>
+    <text x="130" y="257" text-anchor="middle" fill="#64748b" font-size="11">caches.match(request))</text>
+    <text x="130" y="285" text-anchor="middle" fill="#16a34a" font-size="11">Offline-first PWA</text>
+
+    <!-- Redis Cache -->
+    <rect x="265" y="165" rx="12" width="230" height="150" fill="#fff7ed" stroke="#fdba74"/>
+    <text x="380" y="192" text-anchor="middle" fill="#9a3412" font-weight="700" font-size="14">🗄️ Redis / App Cache</text>
+    <rect x="295" y="205" rx="4" width="170" height="28" fill="#ffedd5"/>
+    <text x="380" y="224" text-anchor="middle" fill="#9a3412" font-size="11">client.setEx('user:123', 3600, data)</text>
+    <text x="380" y="252" text-anchor="middle" fill="#64748b" font-size="12">Write-through / Cache-aside</text>
+    <text x="380" y="275" text-anchor="middle" fill="#64748b" font-size="11">TTL based expiry</text>
+    <text x="380" y="295" text-anchor="middle" fill="#16a34a" font-size="12">Fast API responses</text>
+
+    <!-- Cache flow -->
+    <rect x="520" y="15" rx="12" width="210" height="300" fill="#f0f9ff" stroke="#7dd3fc"/>
+    <text x="625" y="42" text-anchor="middle" fill="#0369a1" font-weight="700" font-size="16">Cache Flow</text>
+    <rect x="540" y="60" rx="8" width="170" height="35" fill="#e0f2fe"/>
+    <text x="625" y="83" text-anchor="middle" fill="#0369a1" font-weight="600" font-size="12">User Request</text>
+    <text x="625" y="100" text-anchor="middle" fill="#475569" font-size="20">⬇</text>
+    <rect x="540" y="108" rx="8" width="170" height="35" fill="#d1fae5"/>
+    <text x="625" y="128" text-anchor="middle" fill="#166534" font-weight="600" font-size="12">Cache Hit?</text>
+    <text x="540" y="152" text-anchor="middle" fill="#16a34a" font-size="11">✅ YES → Serve from Cache</text>
+    <text x="625" y="166" text-anchor="middle" fill="#475569" font-size="20">⬇</text>
+    <text x="540" y="181" text-anchor="middle" fill="#dc2626" font-size="11">❌ NO → Fetch Origin → Store → Return</text>
+    <rect x="540" y="195" rx="8" width="170" height="35" fill="#fef3c7"/>
+    <text x="625" y="215" text-anchor="middle" fill="#854d0e" font-weight="600" font-size="12">Hit Ratio</text>
+    <text x="625" y="245" text-anchor="middle" fill="#475569" font-size="11">Static: > 95%</text>
+    <text x="625" y="262" text-anchor="middle" fill="#475569" font-size="11">API: > 80%</text>
+    <text x="625" y="279" text-anchor="middle" fill="#475569" font-size="11">DB: > 90%</text>
+    <text x="625" y="300" text-anchor="middle" fill="#64748b" font-size="11">Target Cache Hit Ratio</text>
+  </svg>
+</div>
+
+<!-- Section 8: Network Optimization -->
+<div class="section">
+  <h2>📡 Network Optimization</h2>
+  <div class="hinglish">
+    <b>Network</b> optimization से page load time में <b>बड़ा difference</b> आता है. <b>CDN</b>, <b>HTTP/2</b>, <b>Brotli compression</b> और <b>resource hints</b> से network latency कम होती है.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 300" width="750" height="300">
+    <!-- CDN diagram -->
+    <text x="375" y="25" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="16">🌐 CDN — Content Delivery Network</text>
+    <rect x="300" y="40" rx="10" width="150" height="40" fill="#1e40af"/>
+    <text x="375" y="65" text-anchor="middle" fill="#fff" font-weight="700" font-size="15">Origin Server</text>
+
+    <text x="375" y="102" text-anchor="middle" fill="#64748b" font-size="22">⬇</text>
+    <text x="375" y="118" text-anchor="middle" fill="#64748b" font-size="11">Sync to CDN</text>
+
+    <rect x="50" y="130" rx="8" width="150" height="60" fill="#3b82f6"/>
+    <text x="125" y="157" text-anchor="middle" fill="#fff" font-weight="600" font-size="14">CDN Edge NA</text>
+    <text x="125" y="177" text-anchor="middle" fill="#bfdbfe" font-size="11">⚡ 20ms to user</text>
+
+    <rect x="300" y="130" rx="8" width="150" height="60" fill="#3b82f6"/>
+    <text x="375" y="157" text-anchor="middle" fill="#fff" font-weight="600" font-size="14">CDN Edge EU</text>
+    <text x="375" y="177" text-anchor="middle" fill="#bfdbfe" font-size="11">⚡ 30ms to user</text>
+
+    <rect x="560" y="130" rx="8" width="150" height="60" fill="#3b82f6"/>
+    <text x="635" y="157" text-anchor="middle" fill="#fff" font-weight="600" font-size="14">CDN Edge ASIA</text>
+    <text x="635" y="177" text-anchor="middle" fill="#bfdbfe" font-size="11">⚡ 25ms to user</text>
+
+    <rect x="50" y="205" rx="8" width="150" height="40" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="125" y="230" text-anchor="middle" fill="#1e40af" font-size="11">👤 User in New York</text>
+    <rect x="300" y="205" rx="8" width="150" height="40" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="375" y="230" text-anchor="middle" fill="#1e40af" font-size="11">👤 User in London</text>
+    <rect x="560" y="205" rx="8" width="150" height="40" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="635" y="230" text-anchor="middle" fill="#1e40af" font-size="11">👤 User in Tokyo</text>
+
+    <text x="375" y="280" text-anchor="middle" fill="#16a34a" font-size="13">✅ Without CDN: 200ms+ latency  |  With CDN: 20-30ms latency</text>
+  </svg>
+
+  <div class="grid">
+    <div class="card"><h3>🚀 HTTP/2 & HTTP/3</h3><p>HTTP/2 multiplexing + HPACK compression. HTTP/3 = QUIC protocol (UDP), 0-RTT setup</p></div>
+    <div class="card"><h3>🗜️ Brotli Compression</h3><p>Brotli (br) से 20% better compression than Gzip. Nginx pe enable करें</p></div>
+    <div class="card"><h3>🔮 Resource Hints</h3><p>preload (critical), preconnect (origins), prefetch (future), dns-prefetch</p></div>
+  </div>
+</div>
+
+<!-- Section 9: Build Tool Optimization -->
+<div class="section">
+  <h2>🏗️ Build Tool Optimization</h2>
+  <div class="hinglish">
+    <b>Build tools</b> aapke code ko <b>production-ready</b> बनाते हैं. <b>Minification</b>, <b>tree shaking</b>, <b>code splitting</b> — ये सब build time pe hota hai. <b>Vite</b> आजकल fastest tool है.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 320" width="750" height="320">
+    <!-- Build pipeline -->
+    <text x="375" y="25" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="18">Build Pipeline</text>
+
+    <rect x="20" y="45" rx="8" width="100" height="50" fill="#e2e8f0"/>
+    <text x="70" y="65" text-anchor="middle" fill="#475569" font-weight="600" font-size="13">Source Code</text>
+    <text x="70" y="82" text-anchor="middle" fill="#64748b" font-size="10">.js, .tsx, .css</text>
+
+    <text x="140" y="72" text-anchor="middle" fill="#64748b" font-size="24">→</text>
+
+    <rect x="160" y="45" rx="8" width="100" height="50" fill="#dbeafe"/>
+    <text x="210" y="65" text-anchor="middle" fill="#1e40af" font-weight="600" font-size="13">Parse &</text>
+    <text x="210" y="82" text-anchor="middle" fill="#1e40af" font-weight="600" font-size="13">Resolve</text>
+
+    <text x="280" y="72" text-anchor="middle" fill="#64748b" font-size="24">→</text>
+
+    <rect x="300" y="45" rx="8" width="100" height="50" fill="#fef3c7"/>
+    <text x="350" y="65" text-anchor="middle" fill="#854d0e" font-weight="600" font-size="13">Transform</text>
+    <text x="350" y="82" text-anchor="middle" fill="#854d0e" font-size="11">Babel/SWC/tsc</text>
+
+    <text x="420" y="72" text-anchor="middle" fill="#64748b" font-size="24">→</text>
+
+    <rect x="440" y="45" rx="8" width="100" height="50" fill="#dcfce7"/>
+    <text x="490" y="65" text-anchor="middle" fill="#166534" font-weight="600" font-size="13">Tree Shake</text>
+    <text x="490" y="82" text-anchor="middle" fill="#166534" font-size="11">+ Chunk</text>
+
+    <text x="560" y="72" text-anchor="middle" fill="#64748b" font-size="24">→</text>
+
+    <rect x="580" y="45" rx="8" width="100" height="50" fill="#fce7f3"/>
+    <text x="630" y="65" text-anchor="middle" fill="#9d174d" font-weight="600" font-size="13">Minify +</text>
+    <text x="630" y="82" text-anchor="middle" fill="#9d174d" font-weight="600" font-size="13">Hash</text>
+
+    <text x="700" y="72" text-anchor="middle" fill="#64748b" font-size="24">→</text>
+
+    <rect x="720" y="45" rx="8" width="25" height="50" fill="#16a34a"/>
+    <text x="732" y="72" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">📦</text>
+
+    <!-- Tools comparison -->
+    <text x="375" y="125" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="16">🛠️ Build Tool Speed Comparison</text>
+
+    <text x="30" y="160" text-anchor="middle" fill="#475569" font-size="13">Webpack 5</text>
+    <rect x="160" y="148" rx="6" width="100" height="20" fill="#fca5a5"/>
+    <text x="210" y="163" text-anchor="middle" fill="#991b1b" font-weight="600" font-size="11">Slow (JS)</text>
+
+    <text x="30" y="190" text-anchor="middle" fill="#475569" font-size="13">Vite 5</text>
+    <rect x="160" y="178" rx="6" width="250" height="20" fill="#86efac"/>
+    <text x="285" y="193" text-anchor="middle" fill="#166534" font-weight="600" font-size="11">Fast (Rollup + esbuild)</text>
+
+    <text x="30" y="220" text-anchor="middle" fill="#475569" font-size="13">esbuild</text>
+    <rect x="160" y="208" rx="6" width="350" height="20" fill="#86efac"/>
+    <text x="335" y="223" text-anchor="middle" fill="#166534" font-weight="600" font-size="11">Very Fast (Go)</text>
+
+    <text x="30" y="250" text-anchor="middle" fill="#475569" font-size="13">Turbopack</text>
+    <rect x="160" y="238" rx="6" width="400" height="20" fill="#86efac"/>
+    <text x="360" y="253" text-anchor="middle" fill="#166534" font-weight="600" font-size="11">Very Fast (Rust)</text>
+
+    <rect x="560" y="145" rx="8" width="160" height="120" fill="#f0fdf4" stroke="#86efac"/>
+    <text x="640" y="170" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="14">Optimized Build</text>
+    <text x="640" y="195" text-anchor="middle" fill="#475569" font-size="12">✅ Minified code</text>
+    <text x="640" y="215" text-anchor="middle" fill="#475569" font-size="12">✅ Content hashes</text>
+    <text x="640" y="235" text-anchor="middle" fill="#475569" font-size="12">✅ Code splitted</text>
+    <text x="640" y="255" text-anchor="middle" fill="#475569" font-size="12">✅ Tree shaken</text>
+  </svg>
+
+  <div class="grid">
+    <div class="card"><h3>⚡ Use Vite</h3><p>Fastest build times, esbuild + Rollup power. 10x faster than Webpack in dev</p></div>
+    <div class="card"><h3>🔪 Tree Shaking</h3><p>ES modules use karo ताकि unused code apne aap remove हो</p></div>
+    <div class="card"><h3>🔢 Content Hashing</h3><p>[contenthash] से file names change tab hoti hai jab content change ho — better caching</p></div>
+  </div>
+</div>
+
+<!-- Section 10: Node.js Performance -->
+<div class="section">
+  <h2>⚙️ Node.js Performance Engineering</h2>
+  <div class="hinglish">
+    <b>Node.js</b> ek <b>single-threaded</b>, <b>event-driven</b> runtime hai. Iska matlab — सारा JavaScript code <b>ek hi thread</b> pe चलता है. Agar aapne <b>event loop</b> block किया तो पूरा server slow हो जाएगा.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 360" width="750" height="360">
+    <!-- Event Loop -->
+    <text x="375" y="22" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="16">🔄 Node.js Event Loop</text>
+    <rect x="20" y="35" rx="10" width="710" height="50" fill="#f8fafc" stroke="#cbd5e1"/>
+    <rect x="30" y="43" rx="6" width="80" height="34" fill="#3b82f6"/><text x="70" y="64" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">timers</text>
+    <rect x="118" y="43" rx="6" width="80" height="34" fill="#10b981"/><text x="158" y="64" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">pending</text>
+    <rect x="206" y="43" rx="6" width="80" height="34" fill="#f59e0b"/><text x="246" y="64" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">idle</text>
+    <rect x="294" y="43" rx="6" width="80" height="34" fill="#ef4444"/><text x="334" y="64" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">poll</text>
+    <rect x="382" y="43" rx="6" width="80" height="34" fill="#8b5cf6"/><text x="422" y="64" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">check</text>
+    <rect x="470" y="43" rx="6" width="80" height="34" fill="#ec4899"/><text x="510" y="64" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">close</text>
+    <text x="620" y="65" text-anchor="middle" fill="#64748b" font-size="12">→ Repeat forever</text>
+
+    <!-- Blocking vs Non-blocking -->
+    <text x="375" y="110" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="16">Blocking vs Non-Blocking Code</text>
+
+    <rect x="20" y="125" rx="8" width="350" height="90" fill="#fee2e2" stroke="#fca5a5"/>
+    <text x="195" y="150" text-anchor="middle" fill="#991b1b" font-weight="700" font-size="14">❌ Blocking (BAD)</text>
+    <text x="195" y="172" text-anchor="middle" fill="#991b1b" font-size="12">const data = fs.readFileSync('file.json')</text>
+    <text x="195" y="195" text-anchor="middle" fill="#991b1b" font-size="11">Event Loop blocks → No other requests served</text>
+
+    <rect x="390" y="125" rx="8" width="340" height="90" fill="#dcfce7" stroke="#86efac"/>
+    <text x="560" y="150" text-anchor="middle" fill="#166534" font-weight="700" font-size="14">✅ Non-Blocking (GOOD)</text>
+    <text x="560" y="172" text-anchor="middle" fill="#166534" font-size="12">const data = await fs.promises.readFile('file.json')</text>
+    <text x="560" y="195" text-anchor="middle" fill="#166534" font-size="11">Event Loop continues → Handles other requests</text>
+
+    <!-- Clustering -->
+    <text x="375" y="240" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="16">👥 Clustering — Multi-Core Utilization</text>
+    <rect x="270" y="255" rx="8" width="210" height="35" fill="#1e40af"/>
+    <text x="375" y="278" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">Master Process</text>
+
+    <rect x="50" y="305" rx="6" width="130" height="30" fill="#3b82f6"/>
+    <text x="115" y="325" text-anchor="middle" fill="#fff" font-weight="600" font-size="12">Worker 1 (Core 1)</text>
+    <rect x="200" y="305" rx="6" width="130" height="30" fill="#3b82f6"/>
+    <text x="265" y="325" text-anchor="middle" fill="#fff" font-weight="600" font-size="12">Worker 2 (Core 2)</text>
+    <rect x="350" y="305" rx="6" width="130" height="30" fill="#3b82f6"/>
+    <text x="415" y="325" text-anchor="middle" fill="#fff" font-weight="600" font-size="12">Worker 3 (Core 3)</text>
+    <rect x="500" y="305" rx="6" width="130" height="30" fill="#3b82f6"/>
+    <text x="565" y="325" text-anchor="middle" fill="#fff" font-weight="600" font-size="12">Worker 4 (Core 4)</text>
+
+    <text x="375" y="355" text-anchor="middle" fill="#16a34a" font-size="12">✅ All workers share same port → Automatic load balancing</text>
+  </svg>
+
+  <div class="grid">
+    <div class="card"><h3>🚀 Async All The Way</h3><p>readFileSync, JSON.parse on big data — ye sab event loop block karte hain. Async use karo</p></div>
+    <div class="card"><h3>👥 Clustering</h3><p>PM2 cluster mode ya Node.js cluster module — saare CPU cores use karo, single thread nahi</p></div>
+    <div class="card"><h3>💣 Memory Leaks</h3><p>Global variables, closures, uncleared listeners, unbounded caches — monitoring jaroori hai</p></div>
+  </div>
+</div>
+
+<!-- Section 11: Monitoring & Profiling -->
+<div class="section">
+  <h2>📈 Monitoring & Profiling</h2>
+  <div class="hinglish">
+    <b>"You can't improve what you don't measure."</b> Monitoring se pata chalta hai ki <b>real users</b> ko कितनी speed मिल रही है. <b>RUM</b> (Real User Monitoring) + <b>Synthetic</b> (Lighthouse) dono jaroori hain.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 280" width="750" height="280">
+    <!-- Monitoring stack -->
+    <rect x="20" y="15" rx="10" width="220" height="120" fill="#eff6ff" stroke="#93c5fd"/>
+    <text x="130" y="42" text-anchor="middle" fill="#1e40af" font-weight="700" font-size="15">👁️ Real User Monitoring</text>
+    <text x="130" y="65" text-anchor="middle" fill="#475569" font-size="12">web-vitals library →</text>
+    <text x="130" y="82" text-anchor="middle" fill="#475569" font-size="12">onLCP, onFID, onCLS</text>
+    <text x="130" y="105" text-anchor="middle" fill="#475569" font-size="11">Real data from browsers</text>
+    <text x="130" y="122" text-anchor="middle" fill="#475569" font-size="11">Device, Connection info</text>
+
+    <rect x="265" y="15" rx="10" width="220" height="120" fill="#f0fdf4" stroke="#86efac"/>
+    <text x="375" y="42" text-anchor="middle" fill="#166534" font-weight="700" font-size="15">🤖 Synthetic Monitoring</text>
+    <text x="375" y="65" text-anchor="middle" fill="#475569" font-size="12">Lighthouse CI</text>
+    <text x="375" y="82" text-anchor="middle" fill="#475569" font-size="12">Playwright / Puppeteer</text>
+    <text x="375" y="105" text-anchor="middle" fill="#475569" font-size="11">Consistent environment</text>
+    <text x="375" y="122" text-anchor="middle" fill="#475569" font-size="11">CI/CD में automate</text>
+
+    <rect x="510" y="15" rx="10" width="220" height="120" fill="#fff7ed" stroke="#fdba74"/>
+    <text x="620" y="42" text-anchor="middle" fill="#9a3412" font-weight="700" font-size="15">📊 Backend APM</text>
+    <text x="620" y="65" text-anchor="middle" fill="#475569" font-size="12">OpenTelemetry</text>
+    <text x="620" y="82" text-anchor="middle" fill="#475569" font-size="12">Datadog / New Relic</text>
+    <text x="620" y="105" text-anchor="middle" fill="#475569" font-size="11">CPU, Memory, Event Loop</text>
+    <text x="620" y="122" text-anchor="middle" fill="#475569" font-size="11">Distributed Tracing</text>
+
+    <text x="130" y="158" text-anchor="middle" fill="#64748b" font-size="12">📱 Field Data (Real)</text>
+    <text x="375" y="158" text-anchor="middle" fill="#64748b" font-size="12">🔬 Lab Data (Controlled)</text>
+    <text x="620" y="158" text-anchor="middle" fill="#64748b" font-size="12">⚙️ Server Telemetry</text>
+
+    <!-- Targets table -->
+    <text x="375" y="190" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="15">🎯 Performance Targets</text>
+    <rect x="60" y="203" rx="6" width="120" height="24" fill="#dcfce7"/><text x="120" y="219" text-anchor="middle" fill="#166534" font-weight="600" font-size="12">LCP < 2.5s</text>
+    <rect x="195" y="203" rx="6" width="120" height="24" fill="#dcfce7"/><text x="255" y="219" text-anchor="middle" fill="#166534" font-weight="600" font-size="12">FID < 100ms</text>
+    <rect x="330" y="203" rx="6" width="120" height="24" fill="#dcfce7"/><text x="390" y="219" text-anchor="middle" fill="#166534" font-weight="600" font-size="12">CLS < 0.1</text>
+    <rect x="465" y="203" rx="6" width="120" height="24" fill="#dcfce7"/><text x="525" y="219" text-anchor="middle" fill="#166534" font-weight="600" font-size="12">TTFB < 800ms</text>
+    <rect x="600" y="203" rx="6" width="120" height="24" fill="#dcfce7"/><text x="660" y="219" text-anchor="middle" fill="#166534" font-weight="600" font-size="12">TBT < 200ms</text>
+
+    <text x="375" y="260" text-anchor="middle" fill="#64748b" font-size="12">💡 Alert on regression: LCP > 4s for 5 min → PagerDuty / Slack</text>
+  </svg>
+</div>
+
+<!-- Section 12: React Performance -->
+<div class="section">
+  <h2>⚛️ React Performance</h2>
+  <div class="hinglish">
+    <b>React</b> apne aap me fast hai, लेकिन <b>unnecessary re-renders</b> performance ko ख़राब कर सकते हैं. <b>React.memo</b>, <b>useMemo</b>, <b>useCallback</b> और <b>virtualization</b> से app speed बढ़ाएँ.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 750 340" width="750" height="340">
+    <!-- Re-render problem -->
+    <text x="375" y="25" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="16">🔄 React Re-render Problem</text>
+
+    <rect x="20" y="40" rx="8" width="340" height="70" fill="#fee2e2" stroke="#fca5a5"/>
+    <text x="190" y="62" text-anchor="middle" fill="#991b1b" font-weight="700" font-size="14">❌ Without React.memo</text>
+    <text x="190" y="85" text-anchor="middle" fill="#991b1b" font-size="11">Parent state change</text>
+    <text x="190" y="100" text-anchor="middle" fill="#991b1b" font-size="11">→ All children re-render (even if unchanged)</text>
+
+    <rect x="390" y="40" rx="8" width="340" height="70" fill="#dcfce7" stroke="#86efac"/>
+    <text x="560" y="62" text-anchor="middle" fill="#166534" font-weight="700" font-size="14">✅ With React.memo</text>
+    <text x="560" y="85" text-anchor="middle" fill="#166534" font-size="11">Parent state change</text>
+    <text x="560" y="100" text-anchor="middle" fill="#166534" font-size="11">→ Only children whose props changed re-render</text>
+
+    <!-- Virtualization -->
+    <text x="375" y="135" text-anchor="middle" fill="#0f172a" font-weight="700" font-size="16">📋 Virtualization (Windowing)</text>
+
+    <rect x="30" y="150" rx="8" width="330" height="150" fill="#fee2e2" stroke="#fca5a5"/>
+    <text x="195" y="175" text-anchor="middle" fill="#991b1b" font-weight="700" font-size="14">Without Virtualization</text>
+    <rect x="50" y="188" rx="4" width="60" height="14" fill="#fca5a5"/><text x="80" y="199" text-anchor="middle" fill="#fff" font-size="9">Item 1</text>
+    <rect x="50" y="205" rx="4" width="60" height="14" fill="#fca5a5"/><text x="80" y="216" text-anchor="middle" fill="#fff" font-size="9">Item 2</text>
+    <text x="195" y="225" text-anchor="middle" fill="#991b1b" font-size="10">... 10,000 DOM nodes</text>
+    <text x="195" y="245" text-anchor="middle" fill="#991b1b" font-size="10">Memory: ~50MB</text>
+    <text x="195" y="260" text-anchor="middle" fill="#991b1b" font-size="10">Render: 200ms</text>
+    <text x="195" y="280" text-anchor="middle" fill="#991b1b" font-weight="600" font-size="11">🐌 Slow scrolling</text>
+
+    <rect x="390" y="150" rx="8" width="330" height="150" fill="#dcfce7" stroke="#86efac"/>
+    <text x="555" y="175" text-anchor="middle" fill="#166534" font-weight="700" font-size="14">With react-window</text>
+    <rect x="410" y="188" rx="4" width="60" height="14" fill="#86efac"/><text x="440" y="199" text-anchor="middle" fill="#fff" font-size="9">Item 5</text>
+    <rect x="410" y="205" rx="4" width="60" height="14" fill="#86efac"/><text x="440" y="216" text-anchor="middle" fill="#fff" font-size="9">Item 6</text>
+    <rect x="410" y="222" rx="4" width="60" height="14" fill="#86efac"/><text x="440" y="233" text-anchor="middle" fill="#fff" font-size="9">Item 7</text>
+    <text x="555" y="225" text-anchor="middle" fill="#166534" font-size="10">Only 20-30 DOM nodes</text>
+    <text x="555" y="245" text-anchor="middle" fill="#166534" font-size="10">Memory: ~2MB</text>
+    <text x="555" y="260" text-anchor="middle" fill="#166534" font-size="10">Render: 5ms</text>
+    <text x="555" y="280" text-anchor="middle" fill="#16a34a" font-weight="600" font-size="11">⚡ Smooth 60fps</text>
+  </svg>
+
+  <div class="grid">
+    <div class="card"><h3>🧠 React.memo</h3><p>Component को memoize करें — props change नहीं हुए तो re-render नहीं होगा</p></div>
+    <div class="card"><h3>📐 useMemo/useCallback</h3><p>Heavy calculations ko memoize करें, function references stabilize करें</p></div>
+    <div class="card"><h3>📋 Virtualization</h3><p>100+ items वाली list के लिए react-window use करें — sirf visible items render होंगे</p></div>
+  </div>
+</div>
+
+<!-- Section 13: Performance Checklist -->
+<div class="section">
+  <h2>✅ Performance Checklist</h2>
+  <div class="hinglish">
+    <b>Production mein jaane se pehle</b> — ye checklist use karke ensure karein ki aapki application <b>fully optimized</b> hai.
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>📱 Core Web Vitals</h3>
+      <ul class="checklist">
+        <li>LCP < 2.5s (preload hero image)</li>
+        <li>FID/INP < 100ms (break long tasks)</li>
+        <li>CLS < 0.1 (set image dimensions)</li>
+        <li>TTFB < 800ms (CDN + server opt.)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>🎨 Frontend</h3>
+      <ul class="checklist">
+        <li>Production build (minified)</li>
+        <li>Code splitting at route level</li>
+        <li>Images in WebP/AVIF format</li>
+        <li>Lazy loading for images + components</li>
+        <li>React.memo + useMemo for perf</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>📡 Network</h3>
+      <ul class="checklist">
+        <li>CDN enabled for static assets</li>
+        <li>HTTP/2 or HTTP/3 enabled</li>
+        <li>Brotli compression (fallback Gzip)</li>
+        <li>Resource hints (preload, preconnect)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>⚙️ Backend (Node.js)</h3>
+      <ul class="checklist">
+        <li>Async/await (no sync blocking)</li>
+        <li>Clustering enabled (multi-core)</li>
+        <li>Connection pooling for DB</li>
+        <li>Redis caching for hot data</li>
+        <li>Memory leak monitoring active</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Section 14: Summary -->
+<div class="section" style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:2px solid #7dd3fc">
+  <h2 style="border-left-color:#0284c7">🎯 Summary — Performance Engineering Flow</h2>
+  <div class="hinglish">
+    <b>Performance engineering</b> कोई एक बार का काम नहीं है — यह <b>continuous process</b> है. <b>Measure → Analyze → Optimize → Repeat</b>.
+  </div>
+
+  <svg class="diagram" viewBox="0 0 500 120" width="500" height="120">
+    <rect x="10" y="15" rx="20" width="90" height="40" fill="#3b82f6"/>
+    <text x="55" y="40" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">📏 Measure</text>
+    <text x="110" y="39" text-anchor="middle" fill="#3b82f6" font-weight="700" font-size="22">→</text>
+    <rect x="120" y="15" rx="20" width="90" height="40" fill="#10b981"/>
+    <text x="165" y="40" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">🔍 Analyze</text>
+    <text x="220" y="39" text-anchor="middle" fill="#10b981" font-weight="700" font-size="22">→</text>
+    <rect x="230" y="15" rx="20" width="90" height="40" fill="#f59e0b"/>
+    <text x="275" y="40" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">⚡ Optimize</text>
+    <text x="330" y="39" text-anchor="middle" fill="#f59e0b" font-weight="700" font-size="22">→</text>
+    <rect x="340" y="15" rx="20" width="90" height="40" fill="#8b5cf6"/>
+    <text x="385" y="40" text-anchor="middle" fill="#fff" font-weight="700" font-size="14">🔄 Repeat</text>
+
+    <text x="55" y="80" text-anchor="middle" fill="#475569" font-size="11">Lighthouse, RUM</text>
+    <text x="165" y="80" text-anchor="middle" fill="#475569" font-size="11">Find bottleneck</text>
+    <text x="275" y="80" text-anchor="middle" fill="#475569" font-size="11">Fix & Improve</text>
+    <text x="385" y="80" text-anchor="middle" fill="#475569" font-size="11">Monitor again</text>
+
+    <text x="250" y="110" text-anchor="middle" fill="#64748b" font-size="12">↩️ Continuous Performance Loop</text>
+  </svg>
+
+  <div class="grid" style="margin-top:20px">
+    <div class="card" style="text-align:center">
+      <h3>📉 Before Optimization</h3>
+      <span class="badge poor" style="font-size:1em">LCP: 4.2s | CLS: 0.35 | TBT: 650ms</span>
+      <p style="margin-top:8px">Slow site, poor user experience, low conversion</p>
+    </div>
+    <div class="card" style="text-align:center">
+      <h3>📈 After Optimization</h3>
+      <span class="badge good" style="font-size:1em">LCP: 1.8s | CLS: 0.05 | TBT: 120ms</span>
+      <p style="margin-top:8px">Fast site, happy users, higher revenue 🔥</p>
+    </div>
+  </div>
+</div>
+
+<div style="text-align:center;padding:40px;color:#64748b;font-size:.9em">
+  <p>🚀 Performance Engineering Skill — Complete Guide</p>
+  <p>Made with ❤️ for developers who care about speed</p>
+</div>
+
+</div>
+</body>
+</html>
