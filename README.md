@@ -1,5 +1,5 @@
 # SHODASHA Browser
-
+Author-Ayush singh
 > **Private. Fast. Yours.**
 
 SHODASHA is a privacy-first web browser under development. It aims to deliver
